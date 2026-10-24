@@ -290,6 +290,7 @@ FROM analytics.v_attendance_daily
 WHERE date >= $1::date AND date < ($2::date + 1)
   AND teacher_id = $3
 GROUP BY 1
+HAVING (count(*) filter (where source = 'manual'))::int > 0
 ORDER BY value DESC
 LIMIT 10",
 }

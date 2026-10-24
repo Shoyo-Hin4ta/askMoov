@@ -185,8 +185,14 @@ export function compile(spec: Spec, persona: Persona): Compiled {
   const dims = groupBy.map((g) => `${groupExpr(g, view)} AS ${g}`);
   const select = [...dims, `${def.expression} AS value`].join(",\n  ");
   const groupSql = groupBy.length ? `\nGROUP BY ${groupBy.map((_, i) => i + 1).join(", ")}` : "";
+  // A filtered count grouped by entities lists only the groups that have what it counts: "which students did she override"
+  // must not return every student with an absent row and a 0 (2026-10-24: the critic refused exactly that once it could see
+  // the minimum and the total). Time buckets keep their zeros so a series has no gaps.
+  const dropZeroGroups = def.expression !== undefined && FILTERED_COUNT.test(def.expression)
+    && groupBy.some((g) => ENTITY_DIMS.includes(g)) && !groupBy.some((g) => TIME_BUCKETS.includes(g));
+  const havingSql = dropZeroGroups ? `\nHAVING ${def.expression} > 0` : "";
   const orderSql = `\nORDER BY ${orderClause(spec, groupBy)}`;
-  const sql = `SELECT\n  ${select}\nFROM ${from}\nWHERE ${whereSql}${groupSql}${orderSql}\nLIMIT ${limit}`;
+  const sql = `SELECT\n  ${select}\nFROM ${from}\nWHERE ${whereSql}${groupSql}${havingSql}${orderSql}\nLIMIT ${limit}`;
   return { sql, params: p.values, shape: shapeOf(spec, groupBy), caveats };
 }
 
@@ -208,6 +214,9 @@ function groupExpr(g: GroupBy, view: ViewMap): string {
 }
 
 const TIME_BUCKETS: readonly GroupBy[] = ["week", "day", "hour_bucket", "minute_bucket"];
+const ENTITY_DIMS: readonly GroupBy[] = ["student", "section", "teacher", "room", "wing"];
+/** A registry expression that counts a subset of the view's rows (present, absent, manual, no_card, temp). */
+const FILTERED_COUNT = /count\(\*\) filter \(where/i;
 
 function orderClause(spec: Spec, groupBy: GroupBy[]): string {
   if (spec.order) {

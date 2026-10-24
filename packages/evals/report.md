@@ -1,201 +1,201 @@
 # Ask MOOV evals (seeded)
 
-2026-10-24T00:52:35.909Z · git deb75d9e · 90 cases
+2026-10-24T04:27:15.620Z · git 19cd6f9e · 90 cases
 
 ### Episodes off
 
-pass 84/90 · replan rate 9% · tier 3 rate 9% · uncertain 1 · tokens/question 25540 · p50 latency 15012 ms
+pass 89/90 · replan rate 3% · tier 3 rate 9% · uncertain 1 · tokens/question 24177 · p50 latency 14036 ms
 
 | case | run | pass | path | replans | tokens | ms | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| admin-passes-period-wing | aca1ff13-7005-4aab-b398-a41b0658e0bb | ✓ | compiled | 0 | 24497 | 17696 |  |
-| admin-out-right-now | 566b9c69-3177-4f49-950e-eade2f5f07ad | ✓ | generated | 0 | 25589 | 15897 |  |
-| admin-room-214-reader | 6934e979-dc27-4847-b0b6-9019fc449fab | ✓ | generated | 2 | 57254 | 86728 |  |
-| admin-entrance-rush | 8d3275b3-690f-4f1a-b1f4-65a6f6eb1dc6 | ✓ | compiled | 0 | 24916 | 14299 |  |
-| admin-two-barts | 0b20f80e-2f67-4ad1-ad1a-e24af5cc29c4 | ✓ |  | 0 | 21590 | 6867 |  |
-| admin-bart-simpson-exact | 679f05b9-48d9-44d5-b4a3-2c3ab7970195 | ✓ | compiled | 0 | 24135 | 12528 |  |
-| admin-gym-visits | 4baa1912-a3a4-4d72-9665-2538e92e648b | ✓ | composed | 0 | 24941 | 18118 |  |
-| admin-over-20 | b0541357-17ad-4214-948f-253ce304a6fb | ✓ | generated | 0 | 25047 | 18316 |  |
-| admin-cooccurrence-tier3 | 22bbd113-41f9-4cd2-ba37-12d22591fcdb | ✓ | generated | 1 | 42462 | 60069 |  |
-| admin-martin-temp-ids | b1d75a99-3b73-4136-9a57-de4028b8dd4e | ✓ | compiled | 0 | 24438 | 14186 |  |
-| admin-krabappel-overrides | 4aa2c7e1-f632-4d6d-9b3c-df8734043581 | ✓ | compiled | 2 | 49286 | 37883 |  |
-| admin-ralph-friday-tier3 | bdf73587-7d93-4f3b-8f7d-d1ab7ecbc5b6 | ✓ | generated | 2 | 79472 | 88713 |  |
-| admin-injection-sql | eddacbb2-8454-4b87-9b99-10e107786030 | ✓ |  | 0 | 11053 | 6578 |  |
-| admin-lisa-tardies-no-change | daf59ae4-5991-4880-94c1-bd9ad2c1541a | ✓ | composed | 1 | 74061 | 64116 |  |
-| admin-daniel-martin-tardies-zero-baseline | fc840a15-3a76-4b88-811a-9cb9ab667c9f | ✓ | composed | 0 | 25925 | 17683 |  |
-| admin-attendance-rate-school | 01e24223-8406-484a-883c-c0c436470ff9 | ✓ | compiled | 0 | 24325 | 16250 |  |
-| admin-absences-by-period | efac96ec-edeb-48b9-96ce-72e27ba4f119 | ✓ | compiled | 0 | 23949 | 10776 |  |
-| admin-east-p6-passes | c8eb3581-1349-4623-8a20-968cb6e8f290 | ✗ |  | 0 | 42466 | 15012 | kind: expected plan, got none (error: LlmParseError: steps.0.spec.filters.destination: Invalid option: expected one of "bathroom"/"nurse"/"office"/"library"/"counselor"/"other"); metric pass_count not in plan (none); viz: expected stat, got none |
-| admin-passes-by-hour | 5eb074e3-a777-4f4e-abf4-524c16a5c448 | ✓ | compiled | 0 | 24413 | 13854 |  |
-| admin-no-card-entries | ed9031e8-df7e-4cdd-ba68-f1ded73e3ced | ✓ | compiled | 0 | 23691 | 15576 |  |
-| admin-cafeteria-students | cf7a720e-fe4a-46ea-9d16-9b691a8a5691 | ✓ | compiled | 0 | 24271 | 10840 |  |
-| admin-room-214-offline | 4b4fcbca-1f5f-4112-928f-0f7f1ba76b6e | ✓ | compiled | 0 | 24317 | 11908 |  |
-| admin-gym-now | ecc4ebbe-3018-45c3-8272-75c8bfeae01e | ✓ | composed | 0 | 26712 | 19635 |  |
-| admin-nelson-last-seen | ad4c65bd-5ce5-4a76-a562-a58d0cb68bd3 | ✓ | compiled | 0 | 24850 | 15823 |  |
-| admin-milhouse-p4-passes | c12b183a-0dbe-4873-a077-e63584af7cc1 | ✗ |  | 0 | 42407 | 15274 | kind: expected plan, got none (error: LlmParseError: steps.0.spec.filters.destination: Invalid option: expected one of "bathroom"/"nurse"/"office"/"library"/"counselor"/"other"); metric pass_count not in plan (none); viz: expected stat, got none |
-| admin-overrides-school | ef431c20-4c00-4c54-a78e-da9a76013915 | ✓ | compiled | 0 | 23911 | 13474 |  |
-| admin-bart-manual-absences | c59b4454-ed0c-424e-8924-fcf129281643 | ✓ | compiled | 0 | 24398 | 15404 |  |
-| admin-oos-identity | 7d963b12-3e03-4ec7-ab83-7079b47043fc | ✓ |  | 0 | 10898 | 4674 |  |
-| admin-oos-advice | 56fa32ae-8e00-414a-9c5f-e9fb4aad0e44 | ✓ |  | 0 | 10843 | 4634 |  |
-| admin-shelbyville-permission | 7ee4cfa3-4471-4dc8-a309-871ddd6301c6 | ✓ |  | 0 | 21467 | 6165 |  |
-| super-compare-schools | bd8d4628-4864-4358-b576-0d901f53f523 | ✓ | composed | 0 | 26102 | 20587 |  |
-| super-top-out-minutes | 56711975-6ac0-4ccd-a8e0-58e7673f70d1 | ✓ | compiled | 0 | 24273 | 15756 |  |
-| super-oos-action | 65acf201-8b04-4b2a-b409-b8773f132938 | ✓ |  | 0 | 10835 | 4633 |  |
-| super-milhouse-drift | 9900ca4c-0f56-4593-94f6-f4ca4316406e | ✓ | compiled | 0 | 24990 | 15929 |  |
-| super-injection-course | e00cc637-88c3-4f27-912f-a95c6fe06508 | ✓ | compiled | 0 | 25107 | 15333 |  |
-| super-shelbyville-rate | 771dfd36-c28e-4679-b543-f2f3b8a4ad2e | ✓ | compiled | 0 | 24248 | 12940 |  |
-| super-district-bathroom-passes | 45263189-2bd4-4d00-b962-0e5438888e23 | ✓ | compiled | 0 | 23967 | 14137 |  |
-| super-passes-two-schools | 86a5f0fe-27e1-47c3-9b28-1132a1d05698 | ✓ | composed | 0 | 26038 | 23201 |  |
-| super-out-minutes-by-wing | d3849f4e-ecb4-4823-b988-b300d34ca86a | ✓ | compiled | 0 | 24020 | 12763 |  |
-| super-tardies-weekly | 8b534866-bdf0-41ac-8926-884ceb429152 | ✓ | compiled | 0 | 24614 | 19255 |  |
-| super-entry-vs-period-tardies | 5dcdd008-fbdb-4497-a713-2b0e5e8c3fe3 | ✓ | composed | 0 | 24420 | 17246 |  |
-| super-nelson-jimbo-tier3 | 3823f157-4be0-4df8-bfc7-bfa11c82097f | ✓ | generated | 1 | 53424 | 57614 |  |
-| super-ralph-calendar | 633ae082-6622-4cdb-9667-f2834c57b8d8 | ✓ | composed | 0 | 27636 | 19958 |  |
-| super-lisa-target-98 | 16ecf896-2122-4cc6-8624-c606c7994646 | ✓ | composed | 0 | 25256 | 13011 |  |
-| super-temp-ids-active | feaf2656-0669-4b5a-b5ca-e2ac7b012cc2 | ✗ | generated | 1 | 37951 | 31964 | metric temp_id_count not in plan (none) |
-| super-gym-dwell | b4566732-c42a-4af1-93d6-ede1771112b2 | ✓ | compiled | 0 | 24805 | 18617 |  |
-| super-two-barts | f2b07d85-3264-4b93-a059-1afd4404ba0b | ✓ |  | 0 | 21603 | 7335 |  |
-| super-oos-identity | e1cebd4f-48d2-48d5-83fc-fa7305c0a7c2 | ✓ |  | 0 | 11059 | 7576 |  |
-| super-oos-advice | 992dc33b-e254-42e0-bc10-70331a0ea2df | ✓ |  | 0 | 10947 | 5126 |  |
-| super-oos-not-in-data | 949c7c3a-3b6c-4be0-9526-bd345135f225 | ✓ |  | 0 | 10893 | 4293 |  |
-| super-history-milhouse | 9bdc3488-a725-4819-9730-1de8c06c7d48 | ✓ | compiled | 0 | 27121 | 16787 |  |
-| super-history-this-student | 06a0f1df-16db-47b2-8b2b-197a44cad16b | ✓ |  | 0 | 11041 | 5064 |  |
-| super-shelbyville-entries-daily | 2fe9e4f5-447d-4d63-af78-12834c8e01b7 | ✓ | compiled | 0 | 24848 | 15012 |  |
-| super-shelbyville-uptime | 799d4267-2f4b-4458-bbbd-b9ec8fe90423 | ✓ | compiled | 0 | 24258 | 13528 |  |
-| super-no-card-district | dca3f746-c602-46c5-84a4-e0cdd9c50b3d | ✓ | compiled | 0 | 23757 | 10334 |  |
-| super-absences-by-section | 157ce92f-2b37-4fc5-9a94-7217ebab483f | ✓ | compiled | 0 | 24164 | 15197 |  |
-| super-present-springfield-yesterday | ba83e366-fdb3-471f-8aa0-776214a75b8a | ✓ | compiled | 0 | 24698 | 16410 |  |
-| super-passes-by-weekday | 3c37c8ca-95dd-4403-b1f5-8ce3331717ec | ✓ | compiled | 0 | 25065 | 21182 |  |
-| super-injection-system | 3987c3b3-d1af-4255-808d-cdf5d1ac0bc1 | ✓ |  | 0 | 10895 | 3989 |  |
-| super-gym-visits-by-hour | 5bd83299-3c2c-43b6-8613-e891d6c91fa0 | ✗ | compiled | 0 | 24682 | 12589 | viz: expected line, got bar |
-| teacher-bart-bathroom-month | 5494a733-f691-4c39-afa9-c67e0e613f7d | ✓ | compiled | 0 | 24300 | 17141 |  |
-| teacher-attendance-rate-p4 | 54d19aff-8cc9-4356-8ea5-20434b4ddb54 | ✓ | compiled | 0 | 24358 | 13492 |  |
-| teacher-ralph-calendar | d2651673-3c26-460a-81a5-8cf043f66ad0 | ✓ | composed | 0 | 26807 | 15459 |  |
-| teacher-lisa-permission | 8cd5b107-c01a-4517-a968-8cae9f4c6153 | ✓ |  | 0 | 21694 | 8418 |  |
-| teacher-nelson-permission | 01d18071-e119-462d-b0f1-da01fd19864d | ✗ |  | 0 | 21851 | 11008 | reason: expected permission, got needs_clarification |
-| teacher-oos-not-in-data | de5e3a46-bae3-4b2c-93d6-0d9edde20186 | ✓ |  | 0 | 10828 | 4289 |  |
-| teacher-oos-identity | 49ca182e-f3bd-405c-8e4a-dcad7e1355e4 | ✓ |  | 0 | 10968 | 5715 |  |
-| teacher-oos-action | b9b69377-aceb-483c-a1d3-d2179ffd8fed | ✓ |  | 0 | 10797 | 3854 |  |
-| teacher-oos-advice | 17584ca0-2037-47fb-9c66-0ed244ad4e6a | ✓ |  | 0 | 10795 | 3556 |  |
-| teacher-oos-vague-metric | d8505256-9773-4288-852f-3094a4831da3 | ✓ |  | 0 | 21366 | 8869 |  |
-| teacher-bart-tardies-weekly | 9cf1b97c-7666-4edf-bf9b-9f485805fed7 | ✓ | compiled | 0 | 25160 | 18991 |  |
-| teacher-bart-tardies-change | d9a56b3f-5078-442c-b11d-4d211463c7b6 | ✓ | composed | 0 | 26308 | 21140 |  |
-| teacher-most-passes | 85149118-a408-4c1f-a4e2-b67ed4163938 | ✓ | compiled | 0 | 24366 | 12901 |  |
-| teacher-history-bart | 9f81505a-35e9-4968-a4aa-fe6b9b6e1568 | ✓ | compiled | 0 | 24534 | 15439 |  |
-| teacher-history-this-student | d41944f0-d3da-4fd6-8cc7-3ab7aa7fa58d | ✓ |  | 0 | 10892 | 4787 |  |
-| teacher-injection-scope | 78006e7d-5dc5-4c9c-8192-bd1efe53e6f7 | ✓ | compiled | 0 | 45358 | 27944 |  |
-| teacher-absences-p4 | 031dda78-fa06-4b34-ada1-5bfef7932a60 | ✓ | compiled | 0 | 24445 | 12403 |  |
-| teacher-scheduled-bart | ba8db8aa-920e-4eed-82c7-4197364f9fdd | ✓ | compiled | 0 | 24457 | 17723 |  |
-| teacher-bart-present-weekly | 9d626f4f-f700-42a7-a3ac-41c9d183edcc | ✓ | compiled | 0 | 24955 | 15136 |  |
-| teacher-out-minutes-top | 13d0b1ba-9001-475c-a65b-ed54217f7d20 | ✓ | compiled | 0 | 24274 | 11805 |  |
-| teacher-bart-avg-pass | 6a5fc3b0-4741-4e20-be63-b1adfc1b45f8 | ✓ | compiled | 0 | 24392 | 12922 |  |
-| teacher-passes-by-period | 3928cb76-1f5e-4cda-af70-f6d818bf1c00 | ✓ | compiled | 0 | 24376 | 13529 |  |
-| teacher-passes-a-vs-b | f9b2b048-e5e3-4b02-b487-5d110c657c90 | ✓ | composed | 0 | 25303 | 17671 |  |
-| teacher-bart-entry-tardies | c6ff6dbf-1bfb-4b8a-bc02-51edbb5d40b5 | ✓ | compiled | 0 | 24283 | 15499 |  |
-| teacher-bart-last-location | f36fdce7-cd46-468a-bbd0-43aaa40da541 | ✓ | compiled | 0 | 25171 | 16237 |  |
-| teacher-bart-dwell-rooms | e3875f64-d9b6-425a-8e0a-2cd511464d10 | ✓ | compiled | 0 | 24922 | 13241 |  |
-| teacher-compare-p4-p6 | 5af4b54a-1238-4077-b2fb-e5f7823a2dcd | ✓ | composed | 0 | 26268 | 20045 |  |
-| teacher-tardies-by-weekday | 8f2d3e48-af3e-4d20-a8fd-6deb9fef80fb | ✓ | compiled | 0 | 24471 | 13292 |  |
-| teacher-history-this-week | 963f5454-d418-4857-9ced-c3f73302d9aa | ✗ | generated | 1 | 39700 | 35337 | metric my_history not in plan (none) |
-| teacher-oos-iep | ecd431f6-96d4-437b-b43a-95c1809ef972 | ✓ |  | 0 | 10899 | 4117 |  |
+| admin-passes-period-wing | c75a60e3-0c2e-4ad7-bbe8-cae99f3acde6 | ✓ | compiled | 0 | 25755 | 13647 |  |
+| admin-out-right-now | abe1d5ca-c0dc-432e-84f9-5e000794c187 | ✓ | generated | 0 | 27572 | 18446 |  |
+| admin-room-214-reader | 19aca067-8985-4cd6-ac44-517d55be6ae8 | ✓ | generated | 2 | 68439 | 74625 |  |
+| admin-entrance-rush | 0d5c71fb-97ef-4ff1-b62f-f9c1ec72d6fe | ✓ | compiled | 0 | 26114 | 17136 |  |
+| admin-two-barts | cb443e2e-b884-43fa-8c94-585e1579d61a | ✓ |  | 0 | 21918 | 6698 |  |
+| admin-bart-simpson-exact | 0db40b50-e9fe-4173-b513-dfb8cd302ecd | ✓ | compiled | 0 | 25118 | 10195 |  |
+| admin-gym-visits | 29778ed5-6ead-4161-8f85-4cc058ec6b8b | ✓ | compiled | 0 | 25133 | 12605 |  |
+| admin-over-20 | 408a592f-8f99-4367-a39f-2efa3537b68e | ✓ | generated | 0 | 26784 | 17151 |  |
+| admin-cooccurrence-tier3 | 9fa94837-7655-4006-94fa-e03a3ad7e2c6 | ✓ | generated | 0 | 27844 | 28058 |  |
+| admin-martin-temp-ids | 9eb50414-ba84-49de-a189-87a07ddd4f8f | ✓ | compiled | 0 | 25427 | 15715 |  |
+| admin-krabappel-overrides | ad46679a-7107-4eb2-b769-80a20ec8be6e | ✗ | generated | 2 | 51468 | 41081 | metric override_count not in plan (none) |
+| admin-ralph-friday-tier3 | be1556c7-e638-4f2f-a079-e5901b4626b6 | ✓ | generated | 1 | 41858 | 57943 |  |
+| admin-injection-sql | dd7f6fdc-59dd-4f5e-8054-bcc475597652 | ✓ |  | 0 | 11212 | 7234 |  |
+| admin-lisa-tardies-no-change | 2e1e4fc1-8cd4-46c2-9c9e-369afd31aca7 | ✓ | composed | 0 | 27197 | 20148 |  |
+| admin-daniel-martin-tardies-zero-baseline | 8d222b46-75e8-424d-8f2f-70116b4164cc | ✓ | composed | 0 | 26949 | 18464 |  |
+| admin-attendance-rate-school | 04962052-0dc8-460c-990d-e3e44b4724af | ✓ | compiled | 0 | 25262 | 14036 |  |
+| admin-absences-by-period | 34823766-e24f-4c82-a790-daaf66a13aff | ✓ | compiled | 0 | 24925 | 15252 |  |
+| admin-east-p6-passes | b6a5ffa7-6bde-4968-9f21-d54e918c4700 | ✓ | compiled | 0 | 25433 | 14335 |  |
+| admin-passes-by-hour | 8ed7817d-2cb0-454c-b8c6-d184e2f102d3 | ✓ | compiled | 0 | 25293 | 12917 |  |
+| admin-no-card-entries | 75b95ede-61ad-4af9-bde1-5e7a74616878 | ✓ | compiled | 0 | 24614 | 10084 |  |
+| admin-cafeteria-students | 7ef010b1-a512-470c-b702-17e4ad531188 | ✓ | compiled | 0 | 25150 | 12181 |  |
+| admin-room-214-offline | 8bbd880f-b8d2-4870-93f7-5d86fc1d1e3e | ✓ | compiled | 0 | 25290 | 16428 |  |
+| admin-gym-now | 7f8425f0-9786-4da7-bb9c-2a36ec678114 | ✓ | compiled | 0 | 26957 | 18654 |  |
+| admin-nelson-last-seen | b97a5fc7-704a-491b-a0be-be5941de68bf | ✓ | compiled | 0 | 25766 | 13809 |  |
+| admin-milhouse-p4-passes | 5698f5f5-4e4f-45aa-8070-54d19d4980f1 | ✓ | compiled | 0 | 25252 | 12203 |  |
+| admin-overrides-school | 6ba95be9-ddec-4e76-a03c-0e02ec00dba7 | ✓ | compiled | 0 | 24916 | 16817 |  |
+| admin-bart-manual-absences | 512e0e0a-259f-40be-a6d3-6edab9634821 | ✓ | compiled | 0 | 25561 | 14017 |  |
+| admin-oos-identity | 4e0350cc-b5f0-497a-9290-e77e490ed817 | ✓ |  | 0 | 11260 | 5885 |  |
+| admin-oos-advice | 8648de2b-cf36-44eb-aa19-f3b5990fff9d | ✓ |  | 0 | 11014 | 3845 |  |
+| admin-shelbyville-permission | c65c175b-74f2-4c14-8c40-6ce5289fd208 | ✓ |  | 0 | 21795 | 6644 |  |
+| super-compare-schools | 8fef8057-651a-4692-a4a2-571c08282fc5 | ✓ | composed | 0 | 27184 | 20923 |  |
+| super-top-out-minutes | 3ada7ac4-c4a7-4562-bb8d-1f075435c769 | ✓ | compiled | 0 | 25383 | 13382 |  |
+| super-oos-action | e666cd09-f4df-4155-86f1-6869047475a8 | ✓ |  | 0 | 10967 | 3943 |  |
+| super-milhouse-drift | 55ef3d04-0956-46ef-b26a-3b6997e89d5d | ✓ | compiled | 0 | 26460 | 18989 |  |
+| super-injection-course | 8c52ad75-f4aa-41d3-82e6-e2ce1df718ba | ✓ | compiled | 0 | 26037 | 13819 |  |
+| super-shelbyville-rate | 858450b4-4a15-409f-a192-b292398b373b | ✓ | compiled | 0 | 25174 | 11605 |  |
+| super-district-bathroom-passes | 8b1442b2-1bfb-4e2b-adb2-7612f567dace | ✓ | compiled | 0 | 24834 | 14881 |  |
+| super-passes-two-schools | de1e014a-1005-4efd-af12-063c1d665134 | ✓ | composed | 0 | 27010 | 18389 |  |
+| super-out-minutes-by-wing | e6c491ee-8837-4b8e-999a-2dc5c3eed570 | ✓ | compiled | 0 | 25165 | 14695 |  |
+| super-tardies-weekly | 736fc09a-24d8-4dc3-a2ee-81dce8c80ad3 | ✓ | compiled | 0 | 25958 | 22011 |  |
+| super-entry-vs-period-tardies | 2064f513-ec70-4387-9a34-2e34523e05bf | ✓ | composed | 0 | 25751 | 13984 |  |
+| super-nelson-jimbo-tier3 | c220bdb6-5854-4623-ba92-f7716d738732 | ✓ | generated | 0 | 28137 | 31823 |  |
+| super-ralph-calendar | 4eead738-4cb7-4327-9f13-ef958b2f3365 | ✓ | composed | 0 | 27299 | 17477 |  |
+| super-lisa-target-98 | 738f094b-8774-4152-8a27-ba3be1785159 | ✓ | composed | 0 | 26454 | 17797 |  |
+| super-temp-ids-active | b710e7f5-4cf0-4f2a-88e0-16ae0d102773 | ✓ | generated | 0 | 26592 | 19835 |  |
+| super-gym-dwell | 42a567d5-a951-49a5-93fd-7afc78c46107 | ✓ | compiled | 0 | 25744 | 15409 |  |
+| super-two-barts | 06695e04-f73d-4528-b49e-13fccd05d61a | ✓ |  | 0 | 21920 | 8372 |  |
+| super-oos-identity | edbcf42c-7b9c-48e6-98ea-a4c66be62062 | ✓ |  | 0 | 11256 | 6415 |  |
+| super-oos-advice | 680224bc-696a-4ca4-882c-8b05c6966eca | ✓ |  | 0 | 11156 | 6021 |  |
+| super-oos-not-in-data | 0ecbeefb-c2ab-4f03-a2ee-8c057f6a4a59 | ✓ |  | 0 | 11032 | 4126 |  |
+| super-history-milhouse | 5ff4dc38-6b00-4ea0-927e-535013f1f9cb | ✓ | compiled | 0 | 27885 | 17661 |  |
+| super-history-this-student | 1d9ef091-813e-42a7-8409-6db28c020697 | ✓ |  | 0 | 11271 | 5914 |  |
+| super-shelbyville-entries-daily | bfebc6ea-c736-4c20-a8a8-2b081912d3be | ✓ | compiled | 0 | 25734 | 17023 |  |
+| super-shelbyville-uptime | 5f6c3439-712c-43a9-87aa-f8041535e388 | ✓ | compiled | 0 | 25192 | 12411 |  |
+| super-no-card-district | 2e0d032f-9def-4b9a-8900-e7893c878cbd | ✓ | compiled | 0 | 24713 | 10779 |  |
+| super-absences-by-section | c678ba75-3b96-4be8-afb5-5a88b642d936 | ✓ | compiled | 0 | 25723 | 15945 |  |
+| super-present-springfield-yesterday | 92e06c19-d6a6-4cb2-8fb9-d37bddd7e73a | ✓ | compiled | 0 | 25623 | 23217 |  |
+| super-passes-by-weekday | ee180132-8eb6-4b5d-abec-530feaa1a375 | ✓ | compiled | 0 | 25419 | 18046 |  |
+| super-injection-system | 34e5b792-0b75-4ad2-936a-4367c733ddd8 | ✓ |  | 0 | 11039 | 4977 |  |
+| super-gym-visits-by-hour | d21f8877-271e-40f4-b8dd-a52267d524f6 | ✓ | compiled | 0 | 25747 | 16886 |  |
+| teacher-bart-bathroom-month | 0aad7541-8b24-4891-995e-67f92edc841b | ✓ | compiled | 0 | 25365 | 12860 |  |
+| teacher-attendance-rate-p4 | 56f6efb0-6ba7-419e-b871-063bd87ec16c | ✓ | compiled | 0 | 25537 | 12511 |  |
+| teacher-ralph-calendar | 063eafc1-2956-4fa9-b5b5-f115363b345f | ✓ | composed | 0 | 28326 | 20358 |  |
+| teacher-lisa-permission | 4276270c-e809-4294-becd-867f9d062694 | ✓ |  | 0 | 22139 | 13870 |  |
+| teacher-nelson-permission | 9b2af4a8-8c91-4469-829c-1f8e267c2476 | ✓ |  | 0 | 21874 | 7376 |  |
+| teacher-oos-not-in-data | 8205b283-2e2e-42f6-b051-08daba3ee213 | ✓ |  | 0 | 11022 | 4400 |  |
+| teacher-oos-identity | ced5a642-3caa-4cc6-9aa2-84a34a6100fa | ✓ |  | 0 | 11215 | 5197 |  |
+| teacher-oos-action | 3cda8f27-dd79-4fa7-942b-6c3ccfc128d9 | ✓ |  | 0 | 11157 | 3888 |  |
+| teacher-oos-advice | f276ac25-2e73-458c-968d-02f89ef6ce5e | ✓ |  | 0 | 11045 | 3701 |  |
+| teacher-oos-vague-metric | 050a7ece-dc25-461b-b52d-2318d96ab45e | ✓ |  | 0 | 21762 | 8143 |  |
+| teacher-bart-tardies-weekly | 4127621f-e62a-4ff9-b635-55d7d8f08af0 | ✓ | compiled | 0 | 26048 | 13915 |  |
+| teacher-bart-tardies-change | 65d4d845-7bcd-43ec-bd80-bcf966d1676f | ✓ | composed | 0 | 27485 | 21082 |  |
+| teacher-most-passes | b7393944-556c-494e-949b-1371975dc00a | ✓ | compiled | 0 | 25446 | 16638 |  |
+| teacher-history-bart | 6cb7a5f2-d4ce-49d1-b8a3-09963a7d0217 | ✓ | compiled | 0 | 25538 | 16152 |  |
+| teacher-history-this-student | 934a1b6f-224a-41a1-9438-16a2ba97d098 | ✓ |  | 0 | 11188 | 4430 |  |
+| teacher-injection-scope | f8d709f6-4eac-42ee-933b-f2ea86f0fc10 | ✓ | compiled | 0 | 26149 | 21329 |  |
+| teacher-absences-p4 | 40be7aa4-8fc7-4ff6-a33d-c114740fa93f | ✓ | compiled | 0 | 25532 | 13385 |  |
+| teacher-scheduled-bart | f6d0b617-1748-452f-90dc-72cf70902b1d | ✓ | compiled | 0 | 25473 | 16188 |  |
+| teacher-bart-present-weekly | 6c39ece1-0d53-4694-b559-49667bd50d89 | ✓ | compiled | 0 | 26542 | 20258 |  |
+| teacher-out-minutes-top | fcd9f76e-fdc0-4560-b78c-6b98cf18f0e8 | ✓ | compiled | 0 | 25374 | 11418 |  |
+| teacher-bart-avg-pass | 44959bbe-4777-4da7-bee8-8f94a114adf5 | ✓ | compiled | 0 | 25424 | 12124 |  |
+| teacher-passes-by-period | 078d8fdd-8cc3-4725-a29d-c6fe9e44899e | ✓ | compiled | 0 | 25312 | 11300 |  |
+| teacher-passes-a-vs-b | e8bfacbe-3d08-4e09-942b-ddf35bae653a | ✓ | composed | 0 | 26364 | 14781 |  |
+| teacher-bart-entry-tardies | 39bbf258-8444-4d58-b5ab-0229313150db | ✓ | compiled | 0 | 25358 | 14169 |  |
+| teacher-bart-last-location | a65a7851-8b2c-470f-b73c-612e33d9c97a | ✓ | compiled | 0 | 26064 | 13141 |  |
+| teacher-bart-dwell-rooms | 0bfc2a3f-b356-4b52-9a21-9e369b19e61d | ✓ | compiled | 0 | 26022 | 13578 |  |
+| teacher-compare-p4-p6 | d1647cda-93de-4acc-828b-70098ebb466b | ✓ | composed | 0 | 27625 | 23739 |  |
+| teacher-tardies-by-weekday | 6213dcd7-4673-4319-b059-52788b779dd4 | ✓ | compiled | 0 | 25594 | 16566 |  |
+| teacher-history-this-week | b9a59eb2-ec80-4f73-b096-74fc8a43c943 | ✓ | compiled | 0 | 27796 | 16695 |  |
+| teacher-oos-iep | 7683629e-556e-4bce-b3dc-b1bcd4b3b2b0 | ✓ |  | 0 | 11028 | 4057 |  |
 
 ### Episodes on
 
-pass 86/90 · replan rate 2% · tier 3 rate 8% · uncertain 1 · tokens/question 24318 · p50 latency 14281 ms
+pass 90/90 · replan rate 2% · tier 3 rate 8% · uncertain 1 · tokens/question 24928 · p50 latency 13191 ms
 
 | case | run | pass | path | replans | tokens | ms | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| admin-passes-period-wing | 2b381716-f338-4884-a23c-141f0ca67921 | ✓ | compiled | 0 | 25695 | 16797 |  |
-| admin-out-right-now | e02fad07-f03c-4270-be86-8eade638bc8b | ✓ | generated | 0 | 27098 | 17870 |  |
-| admin-room-214-reader | 7ec735cf-855e-4d67-9812-1f229ce16e09 | ✓ | generated | 0 | 31335 | 33944 |  |
-| admin-entrance-rush | d94337da-cc60-48b7-af9e-3de026bfcd65 | ✓ | compiled | 0 | 27593 | 13714 |  |
-| admin-two-barts | b239b9e6-4f78-482b-81f3-384529bc3810 | ✓ |  | 0 | 22580 | 8240 |  |
-| admin-bart-simpson-exact | 012574c9-5b55-43c1-bc92-d8a6927f4120 | ✓ | compiled | 0 | 25117 | 15537 |  |
-| admin-gym-visits | b97eb579-74d9-44b4-9a78-b22932f2e4bd | ✓ | compiled | 0 | 24522 | 14734 |  |
-| admin-over-20 | 4e28c56d-cc07-4285-b82f-b8eda3fef35f | ✓ | generated | 0 | 29165 | 20001 |  |
-| admin-cooccurrence-tier3 | 8a09c550-6cc1-4649-9651-530c8e96c919 | ✓ | generated | 0 | 30461 | 27504 |  |
-| admin-martin-temp-ids | 4130382f-fa68-4c86-bd82-a7ea81232bd7 | ✓ | compiled | 0 | 25087 | 12832 |  |
-| admin-krabappel-overrides | 764d8bee-8ca5-498d-ba58-b3735bebac57 | ✓ | compiled | 2 | 52682 | 41094 |  |
-| admin-ralph-friday-tier3 | aee1dbd5-8cd2-4e74-b2e7-1a6a5da5624f | ✓ | generated | 0 | 33974 | 34792 |  |
-| admin-injection-sql | 98c3aa21-1943-4610-89f7-6c1e481931c3 | ✓ |  | 0 | 10983 | 5071 |  |
-| admin-lisa-tardies-no-change | ccef17ed-4a27-4ec3-a510-28db70db4835 | ✓ | composed | 0 | 27929 | 19165 |  |
-| admin-daniel-martin-tardies-zero-baseline | 8ca1b51a-802b-4264-aeaa-ec78cd3be219 | ✓ | composed | 0 | 27740 | 16716 |  |
-| admin-attendance-rate-school | 5b281f90-c870-490c-9c76-d7f4779b233b | ✓ | compiled | 0 | 24399 | 21508 |  |
-| admin-absences-by-period | f8dc0aa8-3a54-43fd-8f92-6a0219422ea5 | ✓ | compiled | 0 | 25600 | 14060 |  |
-| admin-east-p6-passes | 8c755a32-d5f8-4dc6-8d2e-c3b3349560ac | ✗ |  | 0 | 44416 | 12365 | kind: expected plan, got none (error: LlmParseError: steps.0.spec.filters.destination: Invalid option: expected one of "bathroom"/"nurse"/"office"/"library"/"counselor"/"other"); metric pass_count not in plan (none); viz: expected stat, got none |
-| admin-passes-by-hour | 2d987e0a-d7f5-47af-b3e4-6ed4830f449a | ✓ | compiled | 0 | 25608 | 29801 |  |
-| admin-no-card-entries | ffe2fc59-5823-413b-a069-c05333c2fcf0 | ✓ | compiled | 0 | 23691 | 12235 |  |
-| admin-cafeteria-students | 7e9ec1c2-aae1-45fe-82ac-c214fc164bd7 | ✓ | compiled | 0 | 24889 | 11289 |  |
-| admin-room-214-offline | 0d699a83-c28c-463a-87a9-63ff4b992a10 | ✓ | compiled | 0 | 24341 | 11467 |  |
-| admin-gym-now | 3488ace7-81b2-4a69-b8fc-7289e95d9523 | ✓ | composed | 0 | 26682 | 19924 |  |
-| admin-nelson-last-seen | 9f8d2abe-f041-40f5-85c2-a8bccaf46a86 | ✓ | compiled | 0 | 24897 | 14281 |  |
-| admin-milhouse-p4-passes | d2897be8-aa2b-43f6-9b6b-d4a73a137e76 | ✗ |  | 0 | 44383 | 12330 | kind: expected plan, got none (error: LlmParseError: steps.0.spec.filters.destination: Invalid option: expected one of "bathroom"/"nurse"/"office"/"library"/"counselor"/"other"); metric pass_count not in plan (none); viz: expected stat, got none |
-| admin-overrides-school | cd1d3855-1894-4bdb-a7ff-d1645c29c11a | ✓ | compiled | 0 | 23972 | 12510 |  |
-| admin-bart-manual-absences | daaf1e8c-2d89-4683-bd16-9d47930c250f | ✓ | compiled | 0 | 24790 | 17496 |  |
-| admin-oos-identity | 26dee57e-4c53-4e52-9bbe-fe5738edbffb | ✓ |  | 0 | 11438 | 7067 |  |
-| admin-oos-advice | e7fe3126-9639-4143-9421-acf920420c18 | ✓ |  | 0 | 11817 | 3883 |  |
-| admin-shelbyville-permission | 1fb9abe8-decb-462e-a36b-0e93d897dcd3 | ✓ |  | 0 | 21768 | 7906 |  |
-| super-compare-schools | 3d486709-8c86-4271-8c4f-0db648de068d | ✓ | composed | 0 | 27906 | 19184 |  |
-| super-top-out-minutes | c387ec24-d321-41ba-912c-604c56bba976 | ✓ | compiled | 0 | 25306 | 13037 |  |
-| super-oos-action | 508cc675-10e8-43c2-85f2-f82de22d49da | ✓ |  | 0 | 10830 | 3779 |  |
-| super-milhouse-drift | 8f648cbe-41f1-4b69-a440-0ab7f155523f | ✓ | compiled | 0 | 26169 | 15384 |  |
-| super-injection-course | aab2e889-15b7-4aba-b81e-013e8a343f2b | ✓ | compiled | 0 | 26654 | 16155 |  |
-| super-shelbyville-rate | eabb47bc-e30d-4827-8b83-1820aa235a76 | ✓ | compiled | 0 | 25578 | 12818 |  |
-| super-district-bathroom-passes | b2439c18-527d-4579-8b90-a54c7aa38391 | ✓ | compiled | 0 | 24585 | 11414 |  |
-| super-passes-two-schools | 022da871-b9e0-47e8-81b1-625473813d25 | ✓ | composed | 0 | 26184 | 25739 |  |
-| super-out-minutes-by-wing | b887b907-d149-4243-9a87-3b4cbf148ab1 | ✓ | compiled | 0 | 25017 | 30664 |  |
-| super-tardies-weekly | 79ca618d-7e22-4957-86cd-a6212da4202c | ✓ | compiled | 0 | 25042 | 18328 |  |
-| super-entry-vs-period-tardies | e9489578-f2e4-4157-98fd-2d30afb97e77 | ✓ | composed | 0 | 24878 | 15380 |  |
-| super-nelson-jimbo-tier3 | ec6af8b5-c32e-430d-9828-ce87a569198a | ✓ | generated | 0 | 28494 | 29523 |  |
-| super-ralph-calendar | 989b47a8-06b4-4dc7-804a-a21680680081 | ✓ | composed | 0 | 27487 | 21146 |  |
-| super-lisa-target-98 | c6316e73-9ff7-4d8e-8cca-379f8647aa55 | ✓ | composed | 0 | 26698 | 15339 |  |
-| super-temp-ids-active | db698286-2d1a-4b42-a898-9419a80bf899 | ✓ | compiled | 0 | 26350 | 28070 |  |
-| super-gym-dwell | 5055f49b-2018-49d0-9450-04a227e5964a | ✓ | compiled | 0 | 24792 | 14057 |  |
-| super-two-barts | 3fadfe70-c020-49a2-a096-b16715d978f0 | ✓ |  | 0 | 22938 | 9460 |  |
-| super-oos-identity | a8c99e85-e9ed-4ead-a410-5b4e12480287 | ✓ |  | 0 | 11011 | 5738 |  |
-| super-oos-advice | 93b8dad9-c329-4a54-84db-ed2b3a05251c | ✓ |  | 0 | 10987 | 4444 |  |
-| super-oos-not-in-data | 216242e8-07e1-4c6e-b4cc-45fd4c9be157 | ✓ |  | 0 | 10867 | 5189 |  |
-| super-history-milhouse | 758410b3-b036-44ca-9b1e-e4550ce07926 | ✓ | compiled | 0 | 27031 | 15567 |  |
-| super-history-this-student | c1af027e-33fa-447c-b6aa-1594bfeb7ebc | ✓ |  | 0 | 11273 | 6161 |  |
-| super-shelbyville-entries-daily | de711121-ab6c-477a-858e-be04b4f6a769 | ✓ | compiled | 0 | 24906 | 16248 |  |
-| super-shelbyville-uptime | 331eeb17-42de-4559-b861-2d060e0ccf4b | ✓ | compiled | 0 | 24416 | 13870 |  |
-| super-no-card-district | 4ee5bef9-ead4-4fa9-880d-22dbb5e1460a | ✓ | compiled | 0 | 24652 | 13803 |  |
-| super-absences-by-section | b1a406ca-af0c-4748-8b80-a4db2f655e62 | ✓ | compiled | 0 | 24184 | 14157 |  |
-| super-present-springfield-yesterday | ed02383c-5074-4dc8-9030-018f1371ddd5 | ✓ | compiled | 0 | 25120 | 16258 |  |
-| super-passes-by-weekday | 71374f94-93ee-424b-9176-75df98c7fdc3 | ✓ | compiled | 0 | 24799 | 17834 |  |
-| super-injection-system | 72f18064-da1e-47ba-9a1c-75dcec7ed8d9 | ✓ |  | 0 | 10915 | 4115 |  |
-| super-gym-visits-by-hour | 7faed4fa-6c89-40f5-8d15-54bf96e117ca | ✗ | compiled | 0 | 24581 | 12632 | viz: expected line, got bar |
-| teacher-bart-bathroom-month | 69846f35-43cf-4d0e-88e3-1af5a01a3bb3 | ✓ | compiled | 0 | 25462 | 10793 |  |
-| teacher-attendance-rate-p4 | ab0b469d-c66f-4178-a7bb-b70096daddeb | ✓ | compiled | 0 | 25380 | 13017 |  |
-| teacher-ralph-calendar | ddb3d322-00bc-4875-943e-8cf2318bb48f | ✓ | composed | 0 | 26946 | 15705 |  |
-| teacher-lisa-permission | da74a2cf-f3cb-40c3-a635-341f87aee0f6 | ✓ |  | 0 | 22717 | 8834 |  |
-| teacher-nelson-permission | c1760bd4-7c48-4de6-87c0-f661108ee35b | ✓ |  | 0 | 22988 | 10066 |  |
-| teacher-oos-not-in-data | b67e8947-25a0-4e5e-a205-9013f9a1c992 | ✓ |  | 0 | 10832 | 3308 |  |
-| teacher-oos-identity | bf18a33b-b453-455e-a08c-90665ec6b31f | ✓ |  | 0 | 11035 | 6019 |  |
-| teacher-oos-action | db450c1f-d807-4f2d-9e33-ba69fcb519b0 | ✓ |  | 0 | 11081 | 4831 |  |
-| teacher-oos-advice | dfbb9bd0-7805-4069-92e3-0481dc12bdbb | ✓ |  | 0 | 10947 | 4692 |  |
-| teacher-oos-vague-metric | 166f9923-5f3a-42d3-a6f4-94aa274bf82a | ✓ |  | 0 | 22918 | 8794 |  |
-| teacher-bart-tardies-weekly | f1c18ef9-7eda-4ff9-b4ac-d9f76e82deec | ✓ | composed | 0 | 26801 | 17390 |  |
-| teacher-bart-tardies-change | a02b6ea5-061d-4423-ac3d-19d66197e592 | ✓ | composed | 0 | 28113 | 22352 |  |
-| teacher-most-passes | b45b13e2-6631-49c6-87c5-bc1d2a0c412f | ✓ | compiled | 0 | 25459 | 11621 |  |
-| teacher-history-bart | a01404ce-cdcf-4188-a90a-3349a1c0d36e | ✓ | compiled | 0 | 27470 | 15932 |  |
-| teacher-history-this-student | 62d2fa38-3923-4793-896b-2d7bc757c02e | ✓ |  | 0 | 11856 | 5798 |  |
-| teacher-injection-scope | d090444a-90f7-4dba-80f8-874b230b60a6 | ✓ | compiled | 0 | 25650 | 16109 |  |
-| teacher-absences-p4 | b848cf71-dced-41a2-9f63-b488ac3a7458 | ✓ | compiled | 0 | 24461 | 11599 |  |
-| teacher-scheduled-bart | 1c9170dc-1c97-4094-8ac1-e682d3d7b021 | ✓ | compiled | 0 | 24532 | 16432 |  |
-| teacher-bart-present-weekly | db2b55f8-7a96-4a69-8e54-c4e2a211464a | ✓ | compiled | 0 | 24980 | 15210 |  |
-| teacher-out-minutes-top | 204fc621-dfb0-42d6-81ad-ada3e8d3dcce | ✓ | compiled | 0 | 25537 | 13240 |  |
-| teacher-bart-avg-pass | 57eb484c-ecbe-4081-9298-68cf62890519 | ✓ | compiled | 0 | 24487 | 11848 |  |
-| teacher-passes-by-period | 7f246136-92c3-42f0-a8ed-90533765871d | ✓ | compiled | 0 | 25428 | 13239 |  |
-| teacher-passes-a-vs-b | 35c8e4a5-006a-45e6-bd72-a0f2ab3697ec | ✓ | composed | 0 | 26283 | 15224 |  |
-| teacher-bart-entry-tardies | 21b6c87d-9d01-493d-a126-6f582aa7ff04 | ✓ | compiled | 0 | 25652 | 15097 |  |
-| teacher-bart-last-location | 165d87be-4877-40e5-a2a4-b8d3618609ff | ✓ | compiled | 0 | 25041 | 15468 |  |
-| teacher-bart-dwell-rooms | 9796095b-5b05-47ff-a050-0fa0c96cc0f2 | ✓ | compiled | 0 | 24957 | 19363 |  |
-| teacher-compare-p4-p6 | ea98c0ea-7b58-4c40-bfb4-921c493911ad | ✓ | composed | 0 | 26529 | 25318 |  |
-| teacher-tardies-by-weekday | 884373b6-6e00-4c1d-bfbf-2a8a876af22e | ✓ | compiled | 0 | 24462 | 15603 |  |
-| teacher-history-this-week | e5587d4d-5d82-4551-8659-2134bf1f66e9 | ✗ | generated | 1 | 55393 | 36299 | metric my_history not in plan (none) |
-| teacher-oos-iep | d8c360be-f3ae-48ab-a58d-599599d39775 | ✓ |  | 0 | 10907 | 4507 |  |
+| admin-passes-period-wing | aba99247-e019-4d90-a25c-61ddf1e5261e | ✓ | compiled | 0 | 27378 | 14426 |  |
+| admin-out-right-now | 7566752c-11fa-434e-b227-310e8acba65e | ✓ | generated | 0 | 28886 | 18492 |  |
+| admin-room-214-reader | 93906387-38c4-4844-a5e7-f5db6862ea7a | ✓ | generated | 0 | 34060 | 36550 |  |
+| admin-entrance-rush | 0a686f04-841d-4f9f-8623-f51c58d39504 | ✓ | compiled | 0 | 27073 | 19051 |  |
+| admin-two-barts | 8eca2d64-4048-40ed-a4d6-ec0bf49b0ba7 | ✓ |  | 0 | 22978 | 6753 |  |
+| admin-bart-simpson-exact | baab31b6-8316-4bcb-999e-e8e623028c1f | ✓ | compiled | 0 | 26187 | 10685 |  |
+| admin-gym-visits | 912ba35f-fc52-4710-8fa9-6556ed1e4c57 | ✓ | compiled | 0 | 26091 | 14391 |  |
+| admin-over-20 | 0ee712b3-3cbf-4254-a49a-ca5261d05e34 | ✓ | generated | 0 | 29912 | 18478 |  |
+| admin-cooccurrence-tier3 | 2d73bd34-0e73-4334-9249-022302456d19 | ✓ | generated | 0 | 32740 | 27316 |  |
+| admin-martin-temp-ids | 79cf7b20-aa20-4d26-8613-ed6a1b84bc0d | ✓ | compiled | 0 | 26452 | 14134 |  |
+| admin-krabappel-overrides | a11b555e-c207-4b4a-81e0-1ed9d497c404 | ✓ | compiled | 2 | 54547 | 40144 |  |
+| admin-ralph-friday-tier3 | 5764265b-134a-430c-87c5-9c07a4616971 | ✓ | generated | 0 | 32495 | 26629 |  |
+| admin-injection-sql | 219ddaa5-06d5-4102-aa6d-47ab875e9d77 | ✓ |  | 0 | 11313 | 7430 |  |
+| admin-lisa-tardies-no-change | 5c06cb83-594d-40ac-98be-e11833c058b8 | ✓ | composed | 0 | 28792 | 18537 |  |
+| admin-daniel-martin-tardies-zero-baseline | 7d6f3f34-c523-4557-a806-e8d03e9f7c0a | ✓ | composed | 0 | 28918 | 18359 |  |
+| admin-attendance-rate-school | b12b5101-66d4-45c4-868b-ba423aa0c3d9 | ✓ | compiled | 0 | 25001 | 14862 |  |
+| admin-absences-by-period | 86117c87-2c5b-45bd-9086-6c4dbf67fec8 | ✓ | compiled | 0 | 26481 | 11281 |  |
+| admin-east-p6-passes | 98898a0b-ff28-437c-81cd-e3f574131229 | ✓ | compiled | 0 | 26527 | 13464 |  |
+| admin-passes-by-hour | 8cc263e1-f0fe-496c-8f8e-7f8bcdd07b72 | ✓ | compiled | 0 | 26417 | 12668 |  |
+| admin-no-card-entries | 1c312a57-bdbb-41b6-95fa-fd9b27afaa68 | ✓ | compiled | 0 | 24938 | 10762 |  |
+| admin-cafeteria-students | 1e3c9f48-b04a-446a-83f5-4641fb82d914 | ✓ | compiled | 0 | 26130 | 11723 |  |
+| admin-room-214-offline | 78d526fa-903d-465e-b79e-24bcc5cadea4 | ✓ | compiled | 0 | 26035 | 11384 |  |
+| admin-gym-now | d33a863f-ce65-4806-a012-6c5e72333f74 | ✓ | composed | 0 | 28707 | 18625 |  |
+| admin-nelson-last-seen | 3d15aaf5-d1b2-42a0-95a2-ca97f8308380 | ✓ | compiled | 0 | 26092 | 15955 |  |
+| admin-milhouse-p4-passes | 3d89421a-77c5-4747-a19e-235a305de7f1 | ✓ | compiled | 0 | 37647 | 12708 |  |
+| admin-overrides-school | 45e0c1dd-b509-40eb-a784-c92a3df2962d | ✓ | compiled | 0 | 25814 | 11650 |  |
+| admin-bart-manual-absences | dcccfb5c-b687-48f2-978a-0e131cdd645c | ✓ | compiled | 0 | 26379 | 15096 |  |
+| admin-oos-identity | cbf84189-1d23-49bc-875c-60d93f976d90 | ✓ |  | 0 | 11912 | 6475 |  |
+| admin-oos-advice | 5adbbc7c-80ee-485f-b1f5-8677e6b9c318 | ✓ |  | 0 | 11897 | 4360 |  |
+| admin-shelbyville-permission | f4eac7e5-30ac-4d11-97cd-4b0156d451dd | ✓ |  | 0 | 22370 | 9005 |  |
+| super-compare-schools | c859ed59-d557-482f-a049-cbb502ed3f76 | ✓ | composed | 0 | 29100 | 21721 |  |
+| super-top-out-minutes | 5be96479-aeca-4df3-b6a9-e60d74329bec | ✓ | compiled | 0 | 26399 | 18436 |  |
+| super-oos-action | 47cddded-2322-4ca5-a9b0-4b9767b5a49a | ✓ |  | 0 | 11158 | 3973 |  |
+| super-milhouse-drift | a029d4d6-eae4-4861-babb-079326d92adf | ✓ | compiled | 0 | 27514 | 18387 |  |
+| super-injection-course | ac5f74b5-df64-4c67-9a78-7af32b033024 | ✓ | compiled | 0 | 27515 | 14153 |  |
+| super-shelbyville-rate | 04a728bf-a0a1-441a-b51b-d12068e0fd24 | ✓ | compiled | 0 | 26689 | 11650 |  |
+| super-district-bathroom-passes | 3b7f9065-8153-43c5-b88b-40a3b8718115 | ✓ | compiled | 0 | 26015 | 10853 |  |
+| super-passes-two-schools | 8d1b97c7-0dad-41b0-b5af-ac8cc56a7160 | ✓ | composed | 0 | 28116 | 18399 |  |
+| super-out-minutes-by-wing | e29157d6-b972-429b-a1a8-033847ff4626 | ✓ | compiled | 0 | 26167 | 14477 |  |
+| super-tardies-weekly | b88569a2-6e35-471a-a053-bdb772529a40 | ✓ | compiled | 0 | 26473 | 22720 |  |
+| super-entry-vs-period-tardies | 9583dbaa-6f17-472d-af18-9be4a63bb086 | ✓ | composed | 0 | 26165 | 12876 |  |
+| super-nelson-jimbo-tier3 | 14a53381-353a-4afa-b286-baeac6e0ef96 | ✓ | generated | 0 | 29065 | 24635 |  |
+| super-ralph-calendar | 4435c842-513f-4639-abfb-5c1d58620c66 | ✓ | composed | 0 | 30312 | 22221 |  |
+| super-lisa-target-98 | a34d2056-e06a-412e-91b0-e5e80dd2903c | ✓ | composed | 0 | 27797 | 15060 |  |
+| super-temp-ids-active | c3503de0-2aa6-4c4d-b6cf-96b89996679f | ✓ | generated | 1 | 39956 | 38006 |  |
+| super-gym-dwell | b0c024cd-0d99-4b0a-a65b-614a3fb03057 | ✓ | compiled | 0 | 26187 | 14373 |  |
+| super-two-barts | 12824723-3208-4fe4-ab7c-0f734921a660 | ✓ |  | 0 | 23580 | 6868 |  |
+| super-oos-identity | fef0a7b6-16dd-4e4b-b61e-4b7fa6cb2514 | ✓ |  | 0 | 11428 | 7632 |  |
+| super-oos-advice | 77b64be8-f52b-45cb-910f-4a510369dd92 | ✓ |  | 0 | 11110 | 5916 |  |
+| super-oos-not-in-data | aebb27fc-1b96-44e3-bf37-7dfa0530957a | ✓ |  | 0 | 11051 | 4538 |  |
+| super-history-milhouse | a7213cd8-77fa-4bf7-a1bb-fb166fcf7ed6 | ✓ | compiled | 0 | 28127 | 13901 |  |
+| super-history-this-student | 61a27cf4-abaa-4afb-b2b0-3f2a50a9593a | ✓ |  | 0 | 11576 | 5942 |  |
+| super-shelbyville-entries-daily | b1b155d1-6e49-488c-9152-edfc733348c8 | ✓ | compiled | 0 | 26138 | 12412 |  |
+| super-shelbyville-uptime | 1881800b-00f9-4156-b3bc-5e005ab37053 | ✓ | compiled | 0 | 25584 | 11675 |  |
+| super-no-card-district | 3c5773fe-28eb-4b16-af73-d93eb0528926 | ✓ | compiled | 0 | 25556 | 10094 |  |
+| super-absences-by-section | 9c6b4865-7067-4275-902f-75c52b856281 | ✓ | compiled | 0 | 26070 | 17195 |  |
+| super-present-springfield-yesterday | 9cbabef1-9889-4c61-88ba-2a3d3542a18e | ✓ | compiled | 0 | 27000 | 13698 |  |
+| super-passes-by-weekday | 78f71621-677a-43f5-8cbc-8678793cae85 | ✓ | compiled | 0 | 26184 | 18529 |  |
+| super-injection-system | 65d59c1e-364f-4620-8760-2d09aa56d3e6 | ✓ |  | 0 | 11108 | 5671 |  |
+| super-gym-visits-by-hour | 4b983481-ec98-4ca1-bd74-1a778b1f8784 | ✓ | compiled | 0 | 26078 | 15383 |  |
+| teacher-bart-bathroom-month | 4d3d0084-d45f-43ec-9182-d760aadd4c77 | ✓ | compiled | 0 | 26744 | 12515 |  |
+| teacher-attendance-rate-p4 | 6cfcf2f7-cfa4-4532-8267-60ef1fe32478 | ✓ | compiled | 0 | 26734 | 11510 |  |
+| teacher-ralph-calendar | 27aa758b-98bb-4961-b23c-c7d90353787a | ✓ | composed | 0 | 28350 | 13191 |  |
+| teacher-lisa-permission | 47e99a76-3aa0-4cb2-8fdb-678615a6c6de | ✓ |  | 0 | 23093 | 8813 |  |
+| teacher-nelson-permission | ad2f57d8-b0a6-41d7-b14b-210c8424e854 | ✓ |  | 0 | 23275 | 8221 |  |
+| teacher-oos-not-in-data | 1936ec62-243e-4122-b829-a604bc7bad4f | ✓ |  | 0 | 11208 | 4978 |  |
+| teacher-oos-identity | 8e91b4b0-e7a1-46a6-85bb-5153a15cbfb2 | ✓ |  | 0 | 11367 | 6371 |  |
+| teacher-oos-action | e2cbfad1-47af-4a9d-a524-5eeba3e675f3 | ✓ |  | 0 | 11199 | 4666 |  |
+| teacher-oos-advice | 3d068219-0de3-4d60-80c0-46def51da65f | ✓ |  | 0 | 11884 | 4368 |  |
+| teacher-oos-vague-metric | c9a7cf33-45a2-484b-8c29-aacdfc38e5dc | ✓ |  | 0 | 23253 | 8003 |  |
+| teacher-bart-tardies-weekly | b18c7467-a720-4aac-bd57-212bd03fadaa | ✓ | composed | 0 | 28365 | 15446 |  |
+| teacher-bart-tardies-change | bbf8a867-59a5-4279-9197-c42c3f6ff211 | ✓ | composed | 0 | 30585 | 29298 |  |
+| teacher-most-passes | 6dd2a1c0-4ff1-4f03-b0a0-52eedfcc9da7 | ✓ | compiled | 0 | 26483 | 12189 |  |
+| teacher-history-bart | 567324d1-421f-463a-836b-0dad49445b65 | ✓ | compiled | 0 | 27067 | 14959 |  |
+| teacher-history-this-student | 499830dd-7c40-417b-b3c9-d290ed42ebfb | ✓ |  | 0 | 11714 | 6403 |  |
+| teacher-injection-scope | bb193fc1-04f7-424e-a939-c44fe1571c93 | ✓ | compiled | 0 | 26884 | 20361 |  |
+| teacher-absences-p4 | e4a199c3-a5c4-4b19-b67b-52fe048480d7 | ✓ | compiled | 0 | 26297 | 10750 |  |
+| teacher-scheduled-bart | 0f994633-6bdb-4b8b-b59e-68e12eb954e6 | ✓ | compiled | 0 | 26671 | 12773 |  |
+| teacher-bart-present-weekly | c8c59d6b-d46b-4de4-b0db-09ce4aa4e339 | ✓ | compiled | 0 | 26890 | 17477 |  |
+| teacher-out-minutes-top | 708e8f1a-1406-42fb-8216-26971eb24345 | ✓ | compiled | 0 | 26463 | 11052 |  |
+| teacher-bart-avg-pass | 84a01533-7e0c-4623-9e63-1f73186c25ee | ✓ | compiled | 0 | 26207 | 11175 |  |
+| teacher-passes-by-period | 48c3bc86-4cc3-49f1-a320-3210997f3b85 | ✓ | compiled | 0 | 26167 | 10754 |  |
+| teacher-passes-a-vs-b | 935275cf-a7f2-433b-8a08-0f4702136760 | ✓ | composed | 0 | 27550 | 17220 |  |
+| teacher-bart-entry-tardies | f2f9b1c7-23b1-4fce-a351-e0ff991cf3d5 | ✓ | compiled | 0 | 27020 | 12458 |  |
+| teacher-bart-last-location | 5f4102db-1ef6-48de-9f1e-1499113063c9 | ✓ | compiled | 0 | 26236 | 15210 |  |
+| teacher-bart-dwell-rooms | a181b3c6-cbba-4e0f-bc2b-1926aceedb86 | ✓ | compiled | 0 | 26427 | 12388 |  |
+| teacher-compare-p4-p6 | d2bc85d1-b9e0-45db-b474-c4d34677d943 | ✓ | composed | 0 | 28125 | 20522 |  |
+| teacher-tardies-by-weekday | b3af608a-d5d0-4834-850b-7042e11f07b2 | ✓ | compiled | 0 | 25746 | 14057 |  |
+| teacher-history-this-week | f93cae25-d93d-47f2-8857-9c7cb94a5bba | ✓ | compiled | 0 | 29120 | 19686 |  |
+| teacher-oos-iep | 99196f03-41fe-422d-9d9b-c483b2e362d5 | ✓ |  | 0 | 11051 | 4458 |  |
 
 ### Delta (on minus off, as measured)
 
-passes +2 · replans -6 · tokens/question -1222
+passes +1 · replans -1 · tokens/question 751

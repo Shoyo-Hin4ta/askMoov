@@ -86,6 +86,19 @@ describe("compiler", () => {
     expect(compile({ metric: "absent_count", time_range: range, group_by: ["period", "wing"] }, admin).shape).toBe("grouped");
   });
 
+  it("a filtered count grouped by an entity drops zero groups; scalars, time series and plain counts keep theirs", () => {
+    const range = { start: "2026-09-28", end: "2026-10-09" };
+    const byStudent = compile(REPRESENTATIVE_SPECS["override_count"]!, admin).sql;
+    expect(byStudent).toContain("HAVING (count(*) filter (where source = 'manual'))::int > 0");
+    expect(byStudent.indexOf("GROUP BY")).toBeLessThan(byStudent.indexOf("HAVING"));
+    expect(byStudent.indexOf("HAVING")).toBeLessThan(byStudent.indexOf("ORDER BY"));
+    expect(compile({ metric: "override_count", entity: { type: "teacher", id: 12 }, time_range: range, filters: { status: "absent" } }, admin).sql).not.toContain("HAVING"); // scalar
+    expect(compile({ metric: "absent_count", entity: { type: "student", id: 1203 }, time_range: range, group_by: ["week"] }, admin).sql).not.toContain("HAVING"); // series keeps zero weeks
+    expect(compile(REPRESENTATIVE_SPECS["present_count_calendar"]!, admin).sql).not.toContain("HAVING"); // a calendar needs its zero days
+    expect(compile({ metric: "pass_count", time_range: range, group_by: ["student"] }, admin).sql).not.toContain("HAVING"); // a plain count has no zero groups
+    expect(compile({ metric: "absent_count", time_range: range, group_by: ["period", "wing"] }, admin).sql).toContain("HAVING");
+  });
+
   it("grouping by wing carries the caveat that rooms outside the wings form an empty group", () => {
     expect(compile(REPRESENTATIVE_SPECS["pass_count_by_period_wing"]!, admin).caveats).toContain("no_wing_group");
     expect(compile(REPRESENTATIVE_SPECS["out_minutes_top"]!, admin).caveats).not.toContain("no_wing_group");
