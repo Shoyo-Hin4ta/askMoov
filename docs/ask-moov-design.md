@@ -1,6 +1,6 @@
 # Ask MOOV: Design and Build Plan
 
-Status: v1, October 17, 2026\. Owner: Ritik. Audience: Claude Code and anyone reviewing the repo.
+Status: v1.1, October 18, 2026\. Owner: Ritik. Audience: Claude Code and anyone reviewing the repo. Changes from v1 are listed in section 19.
 
 ---
 
@@ -27,69 +27,60 @@ What it is not: a MOOV clone, a dashboard, a RAG system, a multi-agent system, a
 ---
 
 ## 2\. Architecture
-
-┌──────── Next.js on Vercel ───────────────────┐
-
-│ Chat UI · persona switch · /ops              │
-
-│ VizRenderer (VizSpec → Recharts)             │
-
-│ POST /api/ask    → insert run, return 202    │
-
-│ POST /api/worker → claim run, invoke graph   │
-
-│                    (maxDuration 300\)         │
-
-└──────────┬──────────────────▲────────────────┘
-
-           │ DB webhook       │ Realtime on runs, run\_steps
-
-           ▼                  │
-
-┌──────── Supabase Postgres ───────────────────┐
-
-│ public:    domain tables (12)                │
-
-│ analytics: views (7), security\_invoker, RLS  │
-
-│ ops:       runs, run\_steps, run\_results,     │
-
-│            llm\_calls, tool\_calls             │
-
-│ memory:    episodes (pgvector),              │
-
-│            semantic\_notes, schema\_examples   │
-
-│ langgraph: checkpoints                       │
-
-│ pg\_cron:   reclaim stale runs every minute   │
-
-└──────────────────────────────────────────────┘
+```
+┌──────── Next.js on Vercel ─────────────────────────┐
+│ Chat UI · persona switch · thread list · /ops      │
+│ VizRenderer (VizSpec → Recharts)                   │
+│ POST /api/ask       → budget check, insert run,    │
+│                       ping worker, return 202      │
+│ POST /api/worker    → claim run, return 202,       │
+│                       run graph after response     │
+│                       (maxDuration 300)            │
+│ GET  /api/runs/[id] → status, steps, result        │
+│                       (UI polls every 1s)          │
+└──────────┬───────────────────▲─────────────────────┘
+           │ pg                │ HTTPS via pg_net
+           ▼                   │
+┌──────── Supabase Postgres ─────────────────────────┐
+│ public:    domain tables (12)                      │
+│ analytics: views (9), security_invoker, RLS        │
+│ ops:       runs, run_steps, run_results,           │
+│            run_entities, llm_calls, tool_calls,    │
+│            schema_meta                             │
+│ memory:    episodes, episode_feedback,             │
+│            domain_notes, schema_examples           │
+│ langgraph: checkpoints                             │
+│ pg_cron:   every minute, re-dispatch runs queued   │
+│            > 1 min or running with heartbeat       │
+│            > 2 min by POSTing /api/worker          │
+└────────────────────────────────────────────────────┘
+```
 
 ### 2.1 Request lifecycle
-
-1. UI posts `{run_id, thread_id, persona, question}` to `/api/ask`. `run_id` is a client-generated UUID and the idempotency key.  
-2. `/api/ask` upserts `ops.runs` with `status = 'queued'`. Returns 202\. Duplicate `run_id` is a no-op.  
-3. Supabase Database Webhook fires on `runs` INSERT or UPDATE where `status = 'queued'`, POSTs `{run_id}` to `/api/worker` with a signed header.  
-4. `/api/worker` claims the run: `UPDATE ops.runs SET status='running', claimed_at=now(), attempt=attempt+1 WHERE id=$1 AND status='queued' RETURNING *`. No row returned means another invocation has it. Exit.  
-5. Worker invokes the LangGraph graph with `thread_id`. If a checkpoint exists for this thread and run, execution resumes at the last incomplete node.  
-6. After each node: write `run_steps` row, update `runs.current_node` and `runs.heartbeat_at`. UI receives both over Realtime.  
-7. On success: write `run_results`, write an episode if the critic passed, set `status='succeeded'`.  
-8. On error: `status='failed'` if `attempt >= 3`, else `status='queued'`, which re-fires the webhook.  
-9. pg\_cron every minute: `UPDATE ops.runs SET status='queued' WHERE status='running' AND heartbeat_at < now() - interval '2 minutes' AND attempt < 3`. Catches functions that died without reporting.  
-10. UI renders answer, VizSpec, caveats, and the SQL for each step.
+1. UI posts `{run_id, thread_id, persona, question}` to `/api/ask`. `run_id` is a client-generated UUID and the idempotency key.
+2. `/api/ask` checks the monthly token budget: `sum(total_tokens)` over `ops.runs` for the current calendar month against `MONTHLY_TOKEN_BUDGET`. Over budget returns 429 with the numbers. Otherwise it inserts `ops.runs` with `status = 'queued'`, `queued_at = now()`, and `git_sha`. Duplicate `run_id` is a no-op (`ON CONFLICT DO NOTHING`).
+3. `/api/ask` POSTs `{run_id}` to `/api/worker` with the `x-worker-secret` header (the ping). It waits only for the worker's 202, not for the run, then returns 202 to the UI.
+4. `/api/worker` verifies the secret, then claims the run: `UPDATE ops.runs SET status='running', claimed_at=now(), heartbeat_at=now(), attempt=attempt+1 WHERE id=$1 AND status='queued' RETURNING *`. No row returned means another invocation has it; return 200 and exit. Otherwise return 202 immediately and run the graph in Next.js's post-response hook (`after()` from `next/server`), which keeps the function alive up to `maxDuration`.
+5. The graph runs with `thread_id`. If a checkpoint exists for this thread and run, execution resumes at the last incomplete node.
+6. After each node: write a `run_steps` row, update `runs.current_node` and `runs.heartbeat_at`.
+7. The UI polls `GET /api/runs/[id]` every second while status is `queued` or `running`. The route reads `ops.runs` and `ops.run_steps`, and once succeeded, `run_results` and the answer. The browser never holds a Supabase key.
+8. On success: write `run_results`, write `run_entities` from `state.resolved`, write an episode if the critic passed, set `status='succeeded'`.
+9. On error: `status='failed'` if the error is non-retryable (refusal, truncation, budget, validation exhausted) or `attempt >= 3`. Otherwise `status='queued'`, `queued_at=now()`, and the worker pings itself once.
+10. pg_cron every minute calls `ops.redispatch()`: stale running runs (`heartbeat_at < now() - interval '2 minutes'`) go back to `queued` if `attempt < 3`, else `failed`; then every run with `status='queued' AND queued_at < now() - interval '1 minute'` is POSTed to `/api/worker` through pg_net. This is the guarantee. The ping in step 3 is only the fast path.
+11. UI renders answer, VizSpec, caveats, and the SQL for each step.
 
 ### 2.2 Stack
-
 | Layer | Choice | Why |
 | :---- | :---- | :---- |
-| Web \+ API | Next.js 15, App Router, Vercel, Fluid compute | Already the stack. 300s function cap is plenty for 3 to 4 LLM calls. |
-| Agent runtime | LangGraph.js \+ `@langchain/langgraph-checkpoint-postgres` | Checkpointing per node for free. |
-| LLM | Claude API, structured outputs via Zod | Prompt caching on the schema prefix. |
-| Database | Supabase Postgres, pgvector, pg\_cron, pg\_net, Database Webhooks | One database for domain, ops, memory, checkpoints, queue. |
+| Web + API | Next.js 15, App Router, Vercel, Fluid compute | Already the stack. 300s function cap is plenty for 3 to 4 LLM calls. |
+| Status transport | UI polls `GET /api/runs/[id]` every second | No Realtime, no websockets, no Supabase key in the browser. One route, one query. |
+| Agent runtime | LangGraph.js + `@langchain/langgraph-checkpoint-postgres` | Checkpointing per node for free. |
+| LLM | `@anthropic-ai/sdk`, structured outputs via Zod. `claude-opus-5-5` for plan, critique, present. `claude-haiku-5-5` for sketch. | Prompt caching on the schema prefix. SDK retries and typed errors behind one wrapper (4.12). |
+| Database | Supabase Postgres, pg_trgm, pg_cron, pg_net | One database for domain, ops, memory, checkpoints, queue. No vector extension. |
 | SQL safety | `libpg-query` (Node bindings for the Postgres parser) | Real parser, not regex. |
 | Charts | Recharts behind a `VizRenderer` | LLM never sees the library. |
 | Tests | Vitest | Unit, compiler snapshots, golden evals. |
+| Package manager | npm workspaces | Already installed. No extra tooling. |
 
 ### 2.3 Repo layout
 
@@ -106,39 +97,40 @@ packages/evals           golden set \+ runner
 ---
 
 ## 3\. Phase ordering and dependencies
-
 | Phase | Deliverable | Depends on |
 | :---- | :---- | :---- |
-| 1 | Agentic structure: graph, state, schemas, tools, compiler, validator, prompts | nothing |
+| 1 | Agentic structure: graph (with `sketch`), state, schemas, tools, compiler, validator, prompts, LLM wrapper | nothing |
 | 2 | Verify structure: unit tests, no database | 1 |
-| 3 | Migrations: domain, analytics views, roles, RLS, ops, memory, checkpoints, cron | nothing (parallelizable with 1\) |
+| 3 | Migrations: domain, analytics views (with `v_my_history`), roles, RLS, ops (with `run_entities`), memory, checkpoints, cron | nothing (parallelizable with 1) |
 | 4 | Seed: deterministic generator with planted stories | 3 |
-| 5 | Authorization: RLS policies live, persona context, scope tests | 3, 4 |
+| 5 | Authorization: RLS policies live, persona context, scope tests, history scope test | 3, 4 |
 | 6 | Observability: ops tables wired, `/ops` queries | 1, 3 |
-| 7 | Durability: `/api/ask`, `/api/worker`, webhook, reclaim cron, chaos flag | 1, 3, 6 |
-| 8 | Memory: checkpointer, episodes, aliases | 3, 7 |
-| 9 | Evals: golden set, runner, CI | 4, 7 |
-| 10 | Frontend: chat, persona switch, VizRenderer, SQL reveal, `/ops` page | everything |
+| 7 | Durability: `/api/ask` with budget check, `/api/worker`, worker ping, re-dispatch cron, chaos flag | 1, 3, 6 |
+| 8 | Memory: checkpointer, entity pinning, episodes with sketch-keyed retrieval, feedback votes | 3, 7 |
+| 9 | Evals: golden set, runner (episodes off and on), CI | 4, 7, 8 |
+| 10 | Frontend: chat, persona switch, thread list, VizRenderer, SQL reveal, thumbs, `/ops` page | everything |
 
-Phase 2 can run without a database because the compiler emits SQL strings and the validator only needs the parser. EXPLAIN is skipped under unit tests. End-to-end verification happens in Phase 9\.
+Phase 2 can run without a database because the compiler emits SQL strings and the validator only needs the parser. EXPLAIN is skipped under unit tests. End-to-end verification happens in Phase 9.
+
+The History shape (14.1) is spread across phases: the `my_history` metric and compiler case in 1, `ops.run_entities` and `analytics.v_my_history` in 3, its RLS policy in 5, the thread list in 10.
 
 ---
 
 ## 4\. Phase 1: Agentic structure
 
 ### 4.1 Graph
+```
+sketch → plan → execute → critique → present
+          ▲       │          │
+          └───────┴──────────┘   (replan, max 2)
+```
 
-plan → execute → critique → present
-
-  ▲       │          │
-
-  └───────┴──────────┘   (replan, max 2\)
-
-Five nodes. `intake` is folded into `plan` as pre-processing. `classify` is folded into `plan` as an output variant.
+Six nodes. `intake` is folded into `plan` as pre-processing. `classify` is folded into `plan` as an output variant.
 
 | Node | LLM? | Does |
 | :---- | :---- | :---- |
-| `plan` | yes | Load persona, schema doc from cache, resolve entities and dates via tools, fetch 3 episodes, emit `Plan` or `OutOfScope`. |
+| `sketch` | yes, `claude-haiku-5-5` | Given the question and the metric names only: `{metrics: Metric[], entity_types: string[], shape}`. Used solely as the episode retrieval key (11.2). Never sees the schema doc. Fails open: on any error `plan` runs with no episodes. |
+| `plan` | yes | Load persona and schema doc from cache, resolve entities and dates via tools, retrieve up to 3 episodes by sketch key (code, not a tool), emit `Plan` or `OutOfScope`. Then run the two post-planner code checks (4.5a) plus ref and metric validation. On a schema-valid but invalid plan, make one corrective call with the error attached. |
 | `execute` | tier 3 only | Loop over `plan.steps` in order. For each: resolve `$refs`, compile (spec) or accept (sql), validate, run with scoped connection, store result. Collect caveats. Checkpoint after each step. |
 | `critique` | yes | Given question, plan, per-step SQL and result summaries: `{pass, reason}`. Separate prompt. Does not see planner reasoning. |
 | `present` | yes | Given question, result summaries, caveats, VizSpec schema: `{answer_md, viz}`. |
@@ -146,12 +138,13 @@ Five nodes. `intake` is folded into `plan` as pre-processing. `classify` is fold
 
 Edges:
 
-- `plan` → `present` if `OutOfScope` (present renders the message; for `needs_clarification` it also renders `options` as chips, and the run ends there).  
-- `plan` → `execute` otherwise.  
-- `execute` → `critique` on success. `execute` → `plan` with error context if a step fails validation or SQL after its own retries (tier 3 only, `retries.sql < 2`). `execute` → `fail` otherwise.  
+- `sketch` → `plan` always. Replans return to `plan`, never to `sketch`.
+- `plan` → `present` if `OutOfScope` (present renders the message; for `needs_clarification` it also renders `options` as chips, and the run ends there).
+- `plan` → `execute` otherwise.
+- `execute` → `critique` on success. `execute` → `plan` with error context if a step fails validation or SQL after its own retries (tier 3 only, `retries.sql < 2`). `execute` → `fail` otherwise.
 - `critique` → `present` on pass. `critique` → `plan` with critique attached if `retries.plan < 2`. `critique` → `present` with `uncertain = true` otherwise.
 
-Hard limits: 4 steps per plan, 2 replans, 2 SQL regenerations per step, 60s total budget, 5s statement timeout per query.
+Hard limits: 4 steps per plan, 2 replans, 2 SQL regenerations per step, 1 corrective planner call per plan attempt, 60s total budget, 5s statement timeout per query, `RUN_TOKEN_CAP` tokens per run (4.13).
 
 ### 4.2 State
 
@@ -169,7 +162,9 @@ type State \= {
 
   resolved: { entities: ResolvedEntity\[\]; dates: ResolvedDates };
 
-  episodes: EpisodeRef\[\];                 // ids \+ templated question \+ spec, not full text
+  sketch: Sketch | null;                  // { metrics, entity_types, shape } from the sketch node; retrieval key only
+
+  episodes: EpisodeRef\[\];                 // ids \+ templated question \+ plan, not full text
 
   plan: Plan | OutOfScope | null;
 
@@ -188,6 +183,8 @@ type State \= {
   retries: { plan: number; sql: number };
 
   schema\_version: string;
+
+  git\_sha: string;                        // VERCEL_GIT_COMMIT_SHA, or git rev-parse HEAD locally
 
 };
 
@@ -302,19 +299,20 @@ Metric registry (`packages/shared/metrics.ts`). Each entry declares its source v
 | `temp_id_count` | `v_cards` | temp IDs issued to a student in the range |
 | `device_uptime` | `v_device_uptime` | online heartbeats / expected heartbeats |
 | `device_offline_minutes` | `v_device_uptime` | sum of offline gaps in school hours |
+| `my_history` | `v_my_history` | past questions by the current user, filterable by `entity` and `time_range`; recall, not student evidence |
 
 The planner picks from this enum. It cannot invent a metric. Adding a metric is a registry entry plus a compiler case plus a test.
 
 ### 4.5 Tools
-
 | Tool | Signature | Notes |
 | :---- | :---- | :---- |
-| `lookup_entity` | `(type, text) → {id, label, detail, confidence}[]` | Checks `state.resolved.entities` first; a name already pinned in this thread resolves to the pinned id. Otherwise pg\_trgm fuzzy match over students, teachers, sections, rooms, zones, scope-aware (a teacher only resolves students on their rosters). If the top two are within 0.1 confidence, planner must emit `needs_clarification` with `options`; `detail` carries what distinguishes them (grade, section, student id). An explicit different name ("Bart Reyes") overwrites the pin. |
+| `lookup_entity` | `(type, text, filters?) → {id, label, detail, confidence}[]` | Checks `state.resolved.entities` first; a name already pinned in this thread resolves to the pinned id. Otherwise pg_trgm fuzzy match over students, teachers, sections, rooms, zones, scope-aware (a teacher only resolves students on their rosters). If the top two are within 0.1 confidence, planner must emit `needs_clarification` with `options`; `detail` carries what distinguishes them (grade, section, student id). An explicit different name ("Bart Reyes") overwrites the pin. |
 | `resolve_dates` | `(text, today, calendar) → {start, end, label}` | "last week", "this marking period", "Tuesdays in September", "today". Uses `school_calendar`. Returns school days only. |
-| `calc` | `(formula, args) → {value, explanation}` | Named formulas: `rate(num, den)`, `change(before, after)`, `classes_to_target(attended, scheduled, target)` (returns `unreachable` when target \> 1), `pct_of(part, whole)`, `avg(values[])`, plus a sandboxed `expr` mode for plain arithmetic. No I/O. |
-| `get_similar_episodes` | `(question_templated) → Episode[3]` | pgvector cosine over `memory.episodes`, filtered to `score >= 0`, same role. |
+| `calc` | `(formula, args) → {value, explanation}` | Named formulas: `rate(num, den)`, `change(before, after)`, `classes_to_target(attended, scheduled, target)` (returns `unreachable` when target > 1), `pct_of(part, whole)`, `avg(values[])`, plus a sandboxed `expr` mode for plain arithmetic. No I/O. |
 
 `run_sql` is not an LLM tool. It is internal to `execute`.
+
+Episode retrieval is not an LLM tool either. It runs in code before the planner prompt is built, keyed by the `sketch` output (11.2). The planner sees the result as text in its prompt and cannot ask for more.
 
 ### 4.5a Entity resolution contract
 
@@ -408,41 +406,68 @@ const VizSpec \= z.object({
 The presenter may override `type` only within the enum, and must fill `title`, labels, and `caveats` (which it copies from state and may reword, never drop). Output: `{ answer_md: string; viz: VizSpec }`. Rows are fetched by the frontend from `ops.run_results`, not embedded.
 
 ### 4.10 Prompt layout and caching
-
 System prompt for `plan`, in this order so the static prefix caches:
 
-1. Role and principles (static).  
-2. Schema doc from process cache: views, columns, comments, semantic notes (static per `schema_version`). Marked for prompt caching.  
-3. Metric registry summary and Spec schema (static).  
-4. Persona scope summary (per request).  
-5. Three episodes (per request).  
-6. Resolved entities and dates (per request).  
+1. Role and principles (static).
+2. Schema doc from process cache: views, columns, comments, domain notes (static per `schema_version`). Marked for prompt caching.
+3. Metric registry summary and Spec schema (static).
+4. Persona scope summary (per request).
+5. Up to three episodes retrieved by sketch key, as "past plans that worked" (per request).
+6. Resolved entities and dates (per request).
 7. Last N messages and the question (per request).
 
-`critique` and `present` get smaller prompts. Only `plan` needs the schema.
+`critique` and `present` get smaller prompts. Only `plan` needs the schema. `sketch` gets the metric names and the question, nothing else.
 
 ### 4.11 Process cache
 
 Loaded at module init in the worker function (survives across warm invocations):
 
-- `schemaDoc`: introspect `information_schema.columns` and `pg_description` for `analytics.*`, plus `memory.semantic_notes` and `memory.schema_examples`. Hash → `schema_version`.  
-- `metricRegistry`: from `packages/shared`.  
+- `schemaDoc`: introspect `information_schema.columns` and `pg_description` for `analytics.*`, plus `memory.domain_notes` and `memory.schema_examples`. Hash → `schema_version`.
+- `metricRegistry`: from `packages/shared`.
 - Refresh when `schema_version` in `ops.schema_meta` differs from cached, checked once per invocation (one cheap query).
+
+### 4.12 LLM call wrapper
+
+`packages/agent/src/llm.ts`. Every model call in the graph goes through it. Nothing else imports the Anthropic SDK.
+
+- One client, created at module init: `new Anthropic({ timeout: 30_000, maxRetries: 2 })`. The SDK retries 429, 5xx, 529 and connection errors with backoff. After that they surface as typed errors.
+- `callStructured(schema, system, messages, { model, max_tokens, node })` uses `client.messages.parse` with `zodOutputFormat(schema)` and returns `{ output, usage }`.
+- Before returning, in this order:
+  1. `stop_reason === 'refusal'` → `LlmRefusedError` with `stop_details.category`. Non-retryable.
+  2. `stop_reason === 'max_tokens'` → `LlmTruncatedError`. Non-retryable.
+  3. `parsed_output === null` → `LlmParseError`. Non-retryable.
+- `Anthropic.RateLimitError`, `Anthropic.InternalServerError`, `Anthropic.APIConnectionError` (which includes timeouts) → rethrown as `RetryableError`. The worker maps `RetryableError` to `status='queued'`, `attempt+1`. Everything else maps to `status='failed'` with the error class and message in `runs.error`.
+- Every call writes one `llm_calls` row: node, model, prompt tokens, completion tokens, cache read tokens, latency, `git_sha`, 500-char excerpt. Same transaction as the node's `run_steps` row.
+- After every call: if `runs.total_tokens + usage` exceeds `RUN_TOKEN_CAP`, throw `BudgetExceededError`. Non-retryable.
+- The corrective retry for a schema-valid but invalid plan lives in `plan`, not here. The node appends the validation error as a user message and calls the wrapper again, once. A second failure goes to `fail`.
+
+Test `llm.wrapper.test` (Phase 2) feeds a fake client each shape above and asserts the typed error that comes out.
+
+### 4.13 Budgets
+
+| Variable | Checked where | Effect when exceeded |
+| :---- | :---- | :---- |
+| `MONTHLY_TOKEN_BUDGET` | `/api/ask`, one `sum(total_tokens)` over `ops.runs` for the current calendar month | 429 before any run is created |
+| `RUN_TOKEN_CAP` | LLM wrapper, after every call | `BudgetExceededError`, run fails, visible in `/ops` |
+
+Both are plain env vars. Defaults: 5,000,000 and 150,000.
 
 ---
 
 ## 5\. Phase 2: Verify the structure (no database)
-
 Vitest, all in `packages/agent` and `packages/shared`.
 
 | Test | Asserts |
 | :---- | :---- |
 | `plan.schema.test` | Valid plans parse. Plans with 5 steps, unknown metric, unknown filter, bad ref syntax are rejected. |
-| `compiler.snapshot.test` | For every metric × a representative spec, the SQL snapshot matches. Same input twice is byte-identical. Scope predicate present for teacher persona, absent for super\_admin. |
-| `validator.test` | Rejects `DELETE`, `UPDATE`, `SELECT ... INTO`, two statements, `public.students`, `pg_sleep()`, missing LIMIT on tier 3\. Accepts every compiler snapshot. |
+| `sketch.schema.test` | Sketch output parses; unknown metric names are rejected; empty metrics is allowed (no retrieval). |
+| `compiler.snapshot.test` | For every metric × a representative spec, the SQL snapshot matches. Same input twice is byte-identical. Scope predicate present for teacher persona, absent for super_admin. `my_history` compiles against `v_my_history` only. |
+| `validator.test` | Rejects `DELETE`, `UPDATE`, `SELECT ... INTO`, two statements, `public.students`, `ops.runs`, `pg_sleep()`, missing LIMIT on tier 3. Accepts every compiler snapshot. |
 | `refs.test` | `$a.value`, `$a.rows[0].student_id`, `$b.rows[*].x` resolve. Missing step, out-of-range index, wrong type fail with a readable error. |
 | `calc.test` | Every named formula, edge cases: zero denominator, target unreachable, empty list. |
-| `graph.topology.test` | With a fake executor and fake LLM: happy path visits plan → execute → critique → present. Critique fail replans at most twice then presents with `uncertain`. Validation fail on tier 3 regenerates at most twice then fails. OutOfScope skips execute. |
+| `llm.wrapper.test` | Fake client returns refusal, max_tokens, null parsed output, 429 after retries, timeout: each produces its typed error. Token cap exceeded produces `BudgetExceededError`. |
+| `episodes.templatize.test` | Questions with resolved entities become `{student}`, `{section}`, `{teacher}`, `{room}`, `{date_range}`; no name from `resolved` survives in the output. |
+| `graph.topology.test` | With a fake executor and fake LLM: happy path visits sketch → plan → execute → critique → present. Sketch failure still reaches plan with no episodes. Critique fail replans at most twice then presents with `uncertain`. Validation fail on tier 3 regenerates at most twice then fails. Schema-valid but invalid plan gets exactly one corrective call. OutOfScope skips execute. |
 | `state.size.test` | Serialized state after each node stays under 32 KB with a 500-row result (rows are not in state). |
 
 Definition of done: all green, no database connection string in the test environment.
@@ -507,68 +532,75 @@ Indexes: `taps(student_id, ts)`, `taps(device_id, ts)`, `taps(location_id, ts)`,
 `school_id` is on every fact table so super\_admin scope is a real predicate, not "no predicate."
 
 **002\_analytics\_views.sql** (schema `analytics`)
-
 All views are `CREATE VIEW ... WITH (security_invoker = true)`. Without `security_invoker`, a view runs as its owner and bypasses RLS on the base tables. This flag is the whole authorization story.
 
 | View | Grain | Key columns |
 | :---- | :---- | :---- |
-| `v_attendance_daily` | student × section × date | status, source, period, teacher\_id, room\_id, wing |
-| `v_tardies` | one row per tardy | student\_id, kind (entry or period), section\_id, period, date, minutes\_late |
-| `v_passes` | one row per pass | student\_id, section\_id, origin\_room\_id, wing, destination, issuer, started\_at, ended\_at, minutes, over\_limit, period, day\_of\_week, ab\_day |
-| `v_entry` | one row per kiosk tap at entrance | student\_id, ts, result, tardy, minutes\_after\_bell |
-| `v_presence` | one row per arrival | student\_id, location, location\_kind, arrived\_at, left\_by, left\_by\_kind (exit\_tap, pass\_tap\_out, next\_arrival, end\_of\_day), next\_location |
-| `v_section_roster` | student × section | teacher\_id, period, room\_id, course |
-| `v_cards` | student × card | type, status, issued\_at, active\_card\_type, temp\_ids\_issued\_30d |
-| `v_device_uptime` | device × school hour | online\_ratio, offline\_minutes, room\_id |
+| `v_attendance_daily` | student × section × date | status, source, period, teacher_id, room_id, wing |
+| `v_tardies` | one row per tardy | student_id, kind (entry or period), section_id, period, date, minutes_late |
+| `v_passes` | one row per pass | student_id, section_id, origin_room_id, wing, destination, issuer, started_at, ended_at, minutes, over_limit, period, day_of_week, ab_day |
+| `v_entry` | one row per kiosk tap at entrance | student_id, ts, result, tardy, minutes_after_bell |
+| `v_presence` | one row per arrival | student_id, location, location_kind, arrived_at, left_by, left_by_kind (exit_tap, pass_tap_out, next_arrival, end_of_day), next_location |
+| `v_section_roster` | student × section | teacher_id, period, room_id, course |
+| `v_cards` | student × card | type, status, issued_at, active_card_type, temp_ids_issued_30d |
+| `v_device_uptime` | device × school hour | online_ratio, offline_minutes, room_id |
+| `v_my_history` | one row per (run, resolved entity) asked by the current user | run_id, thread_id, asked_at, question, entity_type, entity_id, metrics, answer_excerpt |
+
+`v_my_history` reads `ops.runs` and `ops.run_entities`, not `public`. It is still `security_invoker`; the RLS policy on those two tables (8.2) filters by `current_setting('app.user_id')`. It is recall of what the user asked, never evidence about a student.
 
 Every view and column gets a `COMMENT`. Two that matter most:
 
-COMMENT ON VIEW analytics.v\_presence IS
+```
+COMMENT ON VIEW analytics.v_presence IS
+ 'One row per arrival. left_by is when the student is next seen somewhere else. left_by_kind says how: exit_tap and pass_tap_out are measured departures; next_arrival and end_of_day are inferred, so left_by is an upper bound on time at this location, not a measurement.';
 
- 'One row per arrival. left\_by is when the student is next seen somewhere else. left\_by\_kind says how: exit\_tap and pass\_tap\_out are measured departures; next\_arrival and end\_of\_day are inferred, so left\_by is an upper bound on time at this location, not a measurement.';
-
-COMMENT ON COLUMN analytics.v\_attendance\_daily.source IS
-
- 'tap \= marked present by reader tap. manual \= teacher changed the status when saving attendance. A manual absent after a tap means the teacher did not see the student in the room.';
+COMMENT ON COLUMN analytics.v_attendance_daily.source IS
+ 'tap = marked present by reader tap. manual = teacher changed the status when saving attendance. A manual absent after a tap means the teacher did not see the student in the room.';
+```
 
 **003\_roles\_rls.sql**
 
 Creates `ask_moov_app`, `ask_moov_query`. Enables RLS on every `public` fact table. Policies in Phase 5 (section 8).
 
 **004\_ops.sql** (schema `ops`)
+```
+runs(id, thread_id, persona jsonb, question, status, current_node, attempt, path, queued_at, claimed_at, heartbeat_at, started_at, finished_at, latency_ms, total_tokens, cost_usd, schema_version, git_sha, uncertain, error, created_at)
+run_steps(id, run_id, node, step_id, attempt, started_at, duration_ms, input_summary jsonb, output_summary jsonb, error)
+run_results(run_id, step_id, columns jsonb, row_count, rows jsonb)
+run_entities(run_id, entity_type, entity_id)          -- from state.resolved at run end; feeds v_my_history
+llm_calls(id, run_id, node, model, prompt_tokens, completion_tokens, cache_read_tokens, latency_ms, git_sha, response_excerpt)
+tool_calls(id, run_id, node, tool, args jsonb, result jsonb, duration_ms)
+schema_meta(schema_version, loaded_at, frozen_now)
+```
 
-runs(id, thread\_id, persona jsonb, question, status, current\_node, attempt, path, claimed\_at, heartbeat\_at, started\_at, finished\_at, latency\_ms, total\_tokens, cost\_usd, schema\_version, uncertain, error)
+`status` is an enum: `queued, running, succeeded, failed`. `path` is `compiled, composed, generated`. Indexes: `runs(status, queued_at)`, `runs(thread_id, created_at)`, `run_entities(entity_type, entity_id)`.
 
-run\_steps(id, run\_id, node, step\_id, attempt, started\_at, duration\_ms, input\_summary jsonb, output\_summary jsonb, error)
+**005_memory.sql** (schema `memory`, extension `pg_trgm` only)
 
-run\_results(run\_id, step\_id, columns jsonb, row\_count, rows jsonb)
+```
+episodes(id, role, question_templated, plan jsonb, metrics text[], shape, critique jsonb, score int, schema_version, git_sha, created_at)
+episode_feedback(episode_id, run_id, user_id, vote, created_at)   -- vote: 1 or -1
+domain_notes(topic, text)                                          -- curated, section 15; changes only by migration
+schema_examples(view_name, question, spec jsonb, sql)
+```
 
-llm\_calls(id, run\_id, node, model, prompt\_tokens, completion\_tokens, cache\_read\_tokens, latency\_ms, response\_excerpt)
+No `vector` extension. `episodes` never stores result rows or names: entities are templatized to `{student}`, `{section}`, `{teacher}`, `{room}`, `{date_range}` before insert. Indexes: GIN on `episodes(metrics)`, GIN trigram on `episodes(question_templated)`, `episode_feedback(episode_id)`.
 
-tool\_calls(id, run\_id, node, tool, args jsonb, result jsonb, duration\_ms)
-
-schema\_meta(schema\_version, loaded\_at)
-
-`status` is an enum: `queued, running, succeeded, failed`. `path` is `compiled, composed, generated`.
-
-**005\_memory.sql** (schema `memory`, extension `vector`)
-
-episodes(id, role, question, question\_templated, plan jsonb, sql\_by\_step jsonb, result\_summary jsonb, critique jsonb, schema\_version, score, embedding vector(1536), created\_at)
-
-semantic\_notes(topic, text)
-
-schema\_examples(view\_name, question, spec jsonb, sql)
-
-**006\_langgraph.sql**
+**006_langgraph.sql**
 
 Tables required by `@langchain/langgraph-checkpoint-postgres` in schema `langgraph`. Use the package's `setup()` once, then commit the resulting DDL here so migrations are the source of truth.
 
-**007\_cron\_webhook.sql**
+**007_cron.sql**
 
-- `pg_cron` job every minute: reclaim stale runs (section 2.1 step 9).  
-- Database Webhook on `ops.runs` for INSERT and UPDATE OF status → `/api/worker`. Configured in the Supabase dashboard or via `supabase/config.toml`; document the exact settings here.
+- Enable `pg_cron` and `pg_net`. `APP_URL` and `WORKER_SECRET` live in Supabase Vault, read inside the function via `vault.decrypted_secrets`.
+- Function `ops.redispatch()`:
+  1. `UPDATE ops.runs SET status='queued', queued_at=now() WHERE status='running' AND heartbeat_at < now() - interval '2 minutes' AND attempt < 3`.
+  2. `UPDATE ops.runs SET status='failed', error='attempts exhausted' WHERE status='running' AND heartbeat_at < now() - interval '2 minutes' AND attempt >= 3`.
+  3. For every run with `status='queued' AND queued_at < now() - interval '1 minute'`: `net.http_post(app_url || '/api/worker', jsonb_build_object('run_id', id), headers with x-worker-secret)`.
+- `cron.schedule('redispatch', '* * * * *', 'select ops.redispatch()')`.
+- No Database Webhook. Nothing to configure in the dashboard beyond the two Vault secrets.
 
-Definition of done: `supabase db reset` applies cleanly. `\dv analytics.*` shows 8 views with comments. `SELECT * FROM analytics.v_passes` as `ask_moov_query` without `set_config` returns zero rows.
+Definition of done: `supabase db reset` applies cleanly. `\dv analytics.*` shows 9 views with comments. `SELECT * FROM analytics.v_passes` as `ask_moov_query` without `set_config` returns zero rows. `SELECT jobname FROM cron.job` shows `redispatch`.
 
 ---
 
@@ -615,9 +647,9 @@ Each is a function applied after the baseline, so it can be toggled off for the 
 
 ### 7.4 Null-data check
 
-`pnpm seed --no-stories` then run the Phase 9 golden set. Every "pattern" question must return nothing interesting (no pair with 5+ same-period overlaps, no drift slope above threshold). This proves the planted stories are what the agent finds, not noise. Record the result in the README.
+`npm run seed -- --no-stories` then run the Phase 9 golden set. Every "pattern" question must return nothing interesting (no pair with 5+ same-period overlaps, no drift slope above threshold). This proves the planted stories are what the agent finds, not noise. Record the result in the README.
 
-Definition of done: `pnpm seed` produces identical row counts and checksums on repeat runs. Row counts: roughly 1.1M taps, 160K passes, 320K attendance rows, 2M heartbeats for Springfield. Adjust `--scale` if Supabase free tier complains.
+Definition of done: `npm run seed` produces identical row counts and checksums on repeat runs. Row counts: roughly 1.1M taps, 160K passes, 320K attendance rows, 2M heartbeats for Springfield. Adjust `--scale` if Supabase free tier complains.
 
 ---
 
@@ -671,6 +703,8 @@ Same pattern for `taps`, `attendance`, `students`, `rosters`, `cards`, `device_h
 
 A teacher's `taps` policy: `student_id IN (SELECT student_id FROM rosters r JOIN sections s ON s.id = r.section_id WHERE s.teacher_id = ...)`. This means a teacher can see where their student tapped in the cafeteria, which is reasonable, but not students they don't teach.
 
+History scope. `ask_moov_query` also gets `SELECT` on `ops.runs` and `ops.run_entities`, each with one policy: `USING ((persona->>'user_id')::int = current_setting('app.user_id', true)::int)`. `analytics.v_my_history` is `security_invoker` like every other view, so a user sees only their own past questions. That holds for every role, including super_admin: history is per user, not per scope.
+
 ### 8.3 Why this is not "the agent sees everything and filters"
 
 The `execute` node opens a transaction on the `ask_moov_query` pool and runs `set_config` for role, user, school before any query. The role has no grants on `public.*` and only `SELECT` on `analytics.*`. Views are `security_invoker`, so RLS on the base tables applies to the view query. If the planner emits a spec for a section the teacher does not teach, the compiler adds the scope predicate (defense in depth), and even if it did not, RLS returns zero rows. There is no code path where out-of-scope rows reach the LLM, the result store, or the UI.
@@ -687,53 +721,62 @@ The planner also receives a scope summary ("you are answering for Edna Krabappel
 | `rls.noconfig.test` | Query pool without `set_config` returns 0 rows everywhere. |
 | `rls.bypass.test` | `ask_moov_query` cannot `SELECT FROM public.passes` directly (permission denied). |
 | `e2e.scope.test` | Teacher asks "How many bathroom passes did Nelson take this month?" where Nelson is not on their rosters → OutOfScope `permission`. Admin asks the same → number. |
+| `rls.history.test` | As user 12, `v_my_history` returns only runs whose `persona->>'user_id'` is 12, across all of user 12's threads. As user 13, zero of them. |
 
 ---
 
 ## 9\. Phase 6: Observability
-
 ### 9.1 Write points
 
 | When | Table | Row |
 | :---- | :---- | :---- |
-| `/api/ask` | `runs` | insert, `queued` |
-| `/api/worker` claim | `runs` | `running`, `attempt`, `claimed_at` |
+| `/api/ask` | `runs` | insert, `queued`, `queued_at`, `git_sha` |
+| `/api/worker` claim | `runs` | `running`, `attempt`, `claimed_at`, `heartbeat_at` |
 | every node start/end | `run_steps` | one row per node per attempt, with `input_summary` and `output_summary` (summaries, not full state) |
 | every node end | `runs` | `current_node`, `heartbeat_at` |
-| every LLM call | `llm_calls` | model, tokens, cache reads, latency, 500-char excerpt |
+| every LLM call | `llm_calls` | model, tokens, cache reads, latency, `git_sha`, 500-char excerpt |
 | every tool call | `tool_calls` | tool, args, result, duration |
-| `execute` step done | `run_results` | columns, row\_count, rows (capped at 500\) |
+| `execute` step done | `run_results` | columns, row_count, rows (capped at 500) |
+| graph end | `run_entities` | one row per entity in `state.resolved` |
+| graph end, critic passed | `episodes` | templated question, plan, metrics, shape, score 1 |
+| graph end, replans exhausted | `episodes` | same, score -1 |
+| thumbs up / down | `episode_feedback` | vote; `episodes.score` updated in the same transaction |
 | graph end | `runs` | `succeeded` or `failed`, `latency_ms`, `total_tokens`, `cost_usd`, `path`, `uncertain` |
 
 Writes are batched per node (one transaction), never per token.
 
 ### 9.2 `/ops` queries
 
-- p50 / p95 latency, last 7 days, by `path`.  
-- Critic fail rate, replan rate, tier 3 rate.  
-- Cost per question, tokens per question, cache hit ratio.  
-- Failures by node, last 20 failed runs with error.  
-- Top 20 questions by frequency (templated).  
-- Runs currently `running` with `current_node` and heartbeat age.
+- p50 / p95 latency, last 7 days, by `path`.
+- Critic fail rate, replan rate, tier 3 rate.
+- Cost per question, tokens per question, cache hit ratio. Month-to-date tokens against `MONTHLY_TOKEN_BUDGET`.
+- Failures by node, last 20 failed runs with error.
+- Top 20 questions by frequency (templated).
+- Runs currently `running` with `current_node` and heartbeat age. Runs `queued` older than 1 minute (should be zero).
+- Episodes: count stored, retrieval hit rate (share of runs with at least one episode injected), score distribution, feedback votes last 7 days.
+- Runs by `git_sha`, so a prompt or code change can be compared before and after.
 
-### 9.3 Realtime
+### 9.3 Status transport
 
-UI subscribes to `ops.runs` filtered by `thread_id` and `ops.run_steps` filtered by `run_id`. That is the status stream. No SSE, no websockets of your own.
+The UI polls `GET /api/runs/[id]` every second while a run is `queued` or `running`, and stops on `succeeded` or `failed`. The route returns `status`, `current_node`, `attempt`, the `run_steps` so far, and on success the answer, VizSpec, caveats, SQL per step, and rows from `run_results`. No Realtime, no SSE, no websockets.
 
 ---
 
 ## 10\. Phase 7: Durability
-
 Covered in section 2.1. Additional details:
 
-- `/api/worker` verifies the webhook signature header before anything else.  
-- The claim UPDATE is the concurrency lock. Two deliveries of the same webhook result in one worker.  
-- `maxDuration = 300` in the route segment config.  
-- Heartbeat is written after every node. Reclaim threshold is 2 minutes.  
-- Chaos flag: `runs.persona.chaos = { crash_after: "execute" }` makes the worker throw after that node on attempt 1 only. Used in the Loom to show resume. Disabled in production by env var.  
+- `/api/worker` verifies `x-worker-secret` against `WORKER_SECRET` before anything else. Its only callers are `/api/ask` (the ping), the worker itself after a retryable requeue, and `ops.redispatch()` via pg_net.
+- The claim UPDATE is the concurrency lock. The ping and the cron hitting the same run result in one worker.
+- The worker returns 202 right after the claim and runs the graph in `after()` from `next/server`, so the caller is not held open and the function stays alive up to `maxDuration = 300` in the route segment config.
+- Heartbeat is written after every node. Stale-running threshold is 2 minutes. Stale-queued threshold is 1 minute.
+- `RetryableError` (4.12) → `queued`, `attempt + 1`, one self-ping. Any other error → `failed` with the error class in `runs.error`. Three attempts maximum either way.
+- Chaos flag: `runs.persona.chaos = { crash_after: "execute" }` makes the worker throw after that node on attempt 1 only. Used in the Loom to show resume. Disabled in production by env var.
 - `thread_id` is stable across runs in a conversation. `run_id` is per question. The checkpointer namespace is `thread_id`, and `run_id` is in the checkpoint metadata so a resumed run finds its own partial state.
 
-Test: `durability.resume.test` enqueues a run with `crash_after = execute`, asserts the run reaches `succeeded` on attempt 2 and that `run_steps` has exactly one `plan` row and one `execute` row (not re-run).
+Tests:
+
+- `durability.resume.test` enqueues a run with `crash_after = execute`, asserts the run reaches `succeeded` on attempt 2 and that `run_steps` has exactly one `sketch`, one `plan` and one `execute` row (not re-run).
+- `durability.redispatch.test` inserts a `queued` run with `queued_at` two minutes ago and a `running` run with `heartbeat_at` three minutes ago, calls `ops.redispatch()`, and asserts the running run is back to `queued` and both ids were posted to the worker URL.
 
 ---
 
@@ -748,67 +791,86 @@ Entity pinning lives here. When a clarification resolves, or a lookup returns a 
 No Redis. The checkpointer is the session store. It survives restarts and is what resume reads from.
 
 ### 11.2 Episodic
+Episodic memory is the system remembering which plans worked. No vectors, no embeddings, no names.
 
 Written once per run, after `critique` passes and `present` completes:
 
-- `question`, `question_templated` (entities replaced with `{student}`, `{section}`, `{date_range}` using `resolved`), `plan`, `sql_by_step`, `result_summary`, `critique`, `schema_version`, `score = 1`, `embedding` of `question_templated`.  
-- Thumbs up: `score + 1`. Thumbs down: `score - 2`. Retrieval filters `score >= 0`.  
+- `question_templated`: the question with every entity in `state.resolved` replaced by its type: `{student}`, `{section}`, `{teacher}`, `{room}`, `{date_range}`. Nothing else from the run is stored. No rows, no answer text.
+- `plan` (the final plan JSON), `metrics` (every metric used across its steps), `shape` (`expected_shape`), `critique`, `schema_version`, `git_sha`, `score = 1`.
 - A run that exhausted replans is written with `score = -1` so it is excluded from retrieval but visible in `/ops`.
 
-Read in `plan`: top 3 by cosine similarity on `question_templated`, same `role`, `score >= 0`, `schema_version` within the last 3 versions. Injected as "similar past questions and the plans that worked."
+Feedback: thumbs up inserts `episode_feedback(vote = 1)` and adds 1 to `score`. Thumbs down inserts `vote = -1` and subtracts 2. Same transaction. Retrieval filters `score >= 0`.
+
+Retrieval runs in code inside `plan` pre-processing, keyed by the `sketch` node's output:
+
+```
+SELECT id, question_templated, plan
+FROM memory.episodes
+WHERE metrics && $sketch_metrics
+  AND shape = $sketch_shape
+  AND role = $persona_role
+  AND score >= 0
+ORDER BY (schema_version = $current_schema_version) DESC, score DESC, created_at DESC
+LIMIT 3
+```
+
+If fewer than 3 come back, fill the remainder with pg_trgm: same `role` and `score >= 0` filters, excluding ids already picked, ordered by `similarity(question_templated, $question_templated)` desc. The result is injected into the planner prompt as "past plans that worked", each as the templated question plus its plan JSON.
+
+`EPISODES_ENABLED=false` skips retrieval entirely and is what the eval runner uses for its first pass (section 12). Writing is never skipped.
 
 ### 11.3 What is deliberately not here
 
-No user-level alias memory. "My 4th period" resolves from the persona. "Ms. K" is ambiguous by design and gets a clarification. A disambiguation made in one thread does not carry to another. Two tiers only: the conversation remembers itself (11.1), the system remembers what worked (11.2).
+No user-level alias memory. "My 4th period" resolves from the persona. "Ms. K" is ambiguous by design and gets a clarification. A disambiguation made in one thread does not carry to another.
+
+No vectors or embeddings. Retrieval is keyed by metric and shape, with trigram similarity as fill. Those are exact matches and a number, not a model.
+
+No learned domain knowledge. `domain_notes` is written by us, loaded into the prompt, and changes only by migration. The agent cannot add to it.
+
+History (14.1) is not memory. It is recall of what a user asked, lives in `ops`, and is served through a view like any other data.
+
+Two tiers only: the conversation remembers itself (11.1), the system remembers what worked (11.2).
 
 ---
 
 ## 12\. Phase 9: Evals
-
 `packages/evals/golden/*.json`, one file per persona. 30 cases minimum.
 
+```json
 {
-
   "id": "teacher-attendance-rate-section",
-
-  "persona": { "role": "teacher", "user\_id": 12, "school\_id": 1 },
-
+  "persona": { "role": "teacher", "user_id": 12, "school_id": 1 },
   "question": "What's the attendance rate in my 4th period this month?",
-
   "expect": {
-
     "kind": "plan",
-
-    "steps": \[{ "kind": "spec", "spec": { "metric": "attendance\_rate", "entity": { "type": "section" } } }\],
-
-    "result": { "step": "a", "value\_between": \[0.90, 0.97\] },
-
-    "viz\_type": "stat",
-
-    "caveats\_include": \[\]
-
+    "steps": [{ "kind": "spec", "spec": { "metric": "attendance_rate", "entity": { "type": "section" } } }],
+    "result": { "step": "a", "value_between": [0.90, 0.97] },
+    "viz_type": "stat",
+    "caveats_include": []
   }
-
 }
+```
 
-Runner: for each case, invoke the graph directly (no HTTP), assert plan shape with partial deep match, assert result predicate, assert viz type, assert no out-of-scope rows (row-level check against the persona's scope), record latency and tokens. Output a markdown table to `evals/report.md`. Runs in CI against a seeded Supabase branch.
+Runner: for each case, invoke the graph directly (no HTTP), assert plan shape with partial deep match, assert result predicate, assert viz type, assert no out-of-scope rows (row-level check against the persona's scope), record latency and tokens. Runs in CI against a seeded Supabase branch.
 
-Include 6 out-of-scope cases (one per reason) and 3 tier 3 cases that intentionally fall outside the metric registry.
+The runner executes the golden set twice: first with `EPISODES_ENABLED=false` on an empty `episodes` table, then with `EPISODES_ENABLED=true` using the episodes the first pass wrote. `evals/report.md` has one table per pass and a delta row: pass count, replan rate, tier 3 rate, tokens per question, p50 latency. The delta is reported as measured. Zero or negative is a valid result and is written down as such.
+
+Include 6 out-of-scope cases (one per reason), 3 tier 3 cases that intentionally fall outside the metric registry, and 3 history cases: one named student, one date range only, and one "this student" with no name that must produce `needs_clarification` with options from `v_my_history`.
 
 ---
 
 ## 13\. Phase 10: Frontend (last)
-
 Build order within the phase:
 
-1. Persona switcher in the header: three personas, each a real `(role, user_id, school_id)`. Switching starts a new `thread_id`.  
-2. Chat: question input, message list, status line driven by Realtime (`planning → running step 2 of 3 → checking → done`).  
-3. Answer card: `answer_md`, `VizRenderer(viz, rows)`, caveats as a muted list, collapsible "SQL" section per step, thumbs up / down.  
-4. `VizRenderer`: `stat`, `line`, `bar`, `table`, `calendar`. Recharts for line and bar. Calendar is a 7-column grid of the date range with a color per status.  
-5. "What can I ask?" chip: renders the metric registry as example questions for the current persona.  
-6. `/ops` page: the queries in section 9.2 as cards and small tables. No charts needed beyond a latency histogram.
+1. Persona switcher in the header: three personas, each a real `(role, user_id, school_id)`. Switching starts a new `thread_id`.
+2. Thread list in a sidebar: the persona's threads from `ops.runs` grouped by `thread_id` (first question, last `asked_at`). Clicking one reopens it; the next question continues that thread.
+3. Chat: question input, message list, status line driven by polling `/api/runs/[id]` (`planning → running step 2 of 3 → checking → done`).
+4. Answer card: `answer_md` rendered with raw HTML disabled, `VizRenderer(viz, rows)`, caveats as a muted list, collapsible "SQL" section per step, thumbs up / down posting to `/api/runs/[id]/feedback`.
+5. Clarification chips: `options` from `needs_clarification`. Clicking one sends the chosen entity as the next message in the thread, so it gets pinned.
+6. `VizRenderer`: `stat`, `line`, `bar`, `table`, `calendar`. Recharts for line and bar. Calendar is a 7-column grid of the date range with a color per status.
+7. "What can I ask?" chip: renders the metric registry as example questions for the current persona.
+8. `/ops` page: the queries in section 9.2 as cards and small tables. No charts needed beyond a latency histogram.
 
-No auth. No settings. No mobile layout beyond "doesn't break."
+No auth. No settings. No mobile layout beyond "doesn't break".
 
 ---
 
@@ -830,6 +892,7 @@ No auth. No settings. No mobile layout beyond "doesn't break."
 | Presence | Who tapped into the gym between 2:00 and 2:15? | spec: `visits_to_location` with time\_range |
 | Data quality | Was the Room 214 reader online during 3rd period on October 6? | spec: `device_uptime` |
 | Departure | Who has left the building? | inferred: students with no taps after period N, labeled inferred. Exit kiosks would make this measured; this school has none. |
+| History | What did I ask about this student last week? | spec: `my_history` with `entity` and `time_range` over `v_my_history`. If "this student" resolves to no entity, `needs_clarification` with options built from `v_my_history` (students the user asked about in the range, with counts), not from `lookup_entity`. |
 
 ### 14.2 Out of scope, by reason
 
@@ -840,11 +903,11 @@ No auth. No settings. No mobile layout beyond "doesn't break."
 | `action` | Set a buddy block for Nelson and Jimbo | "I can't change settings. Here's the overlap data to bring to an admin." |
 | `permission` | (teacher) How many passes did Nelson take? (not on roster) | "Nelson isn't in any of your sections, so that's outside your scope." |
 | `advice_or_prediction` | What should I do about Nelson? | "That's a judgment call. Here's his pass history for the last month." |
-| `needs_clarification` | How many passes did Bart take? (two Barts) | "Which Bart?" with chips: "Bart Simpson, 9th, your 4th period" / "Bart Reyes, 11th". Also used for vague metrics ("how is Bart doing?" → attendance, tardies, or passes?) and vague dates. |
+| `needs_clarification` | How many passes did Bart take? (two Barts) | "Which Bart?" with chips: "Bart Simpson, 9th, your 4th period" / "Bart Reyes, 11th". Also used for vague metrics ("how is Bart doing?" → attendance, tardies, or passes?), vague dates, and "this student" with no resolvable entity, where the chips come from `v_my_history` ("Bart Simpson, asked 3 times this week"). |
 
 ---
 
-## 15\. Semantic notes (seed content for `memory.semantic_notes`)
+## 15\. Domain notes (seed content for `memory.domain_notes`)
 
 taps:          A tap on a classroom reader has no intrinsic direction. First tap of the period marks present. A tap while present starts a pass. A tap while out ends the pass. Direction is derived by the backend.
 
@@ -870,56 +933,65 @@ ab\_day:        The school runs an A/B rotation. Period numbers are the same on 
 
 now:           "Now" for live questions is the frozen timestamp in ops.schema\_meta.frozen\_now.
 
+history:       v_my_history is what the current user asked before, across threads. It is recall, not evidence about a student. "This student" with no name resolves from history or asks; it is never guessed.
+
 ---
 
 ## 16\. Non-goals for v1
-
-- Authentication. Personas are chosen, not logged in.  
-- Writes of any kind to domain data. No buddy blocks, no passes, no overrides.  
-- Multi-tenant beyond two seeded schools.  
-- Real SIS integration.  
-- Mobile layout.  
-- Streaming tokens. Status streams; the answer arrives whole.
+- Authentication. Personas are chosen, not logged in.
+- Writes of any kind to domain data. No buddy blocks, no passes, no overrides.
+- Multi-tenant beyond two seeded schools.
+- Real SIS integration.
+- Mobile layout.
+- Streaming tokens. Status is polled; the answer arrives whole.
+- Realtime, websockets, server-sent events, Database Webhooks.
+- Vector search or embeddings of any kind.
+- Learned domain knowledge. `domain_notes` changes only by migration.
 
 ---
 
 ## 17\. Environment and commands
+```
+DATABASE_URL_APP=postgres://ask_moov_app:...
+DATABASE_URL_QUERY=postgres://ask_moov_query:...
+ANTHROPIC_API_KEY=
+APP_URL=                      # public base URL; /api/ask pings APP_URL/api/worker; also stored in Vault for the cron
+WORKER_SECRET=                # value of the x-worker-secret header; also stored in Vault
+MONTHLY_TOKEN_BUDGET=5000000
+RUN_TOKEN_CAP=150000
+EPISODES_ENABLED=true
+CHAOS_ENABLED=false
+VERCEL_GIT_COMMIT_SHA=        # set by Vercel; locally the app falls back to `git rev-parse HEAD`
+```
 
-DATABASE\_URL\_APP=postgres://ask\_moov\_app:...
-
-DATABASE\_URL\_QUERY=postgres://ask\_moov\_query:...
-
-SUPABASE\_URL=
-
-SUPABASE\_ANON\_KEY=
-
-SUPABASE\_SERVICE\_ROLE\_KEY=          \# server only, for Realtime admin and webhook config
-
-ANTHROPIC\_API\_KEY=
-
-WEBHOOK\_SECRET=
-
-CHAOS\_ENABLED=false
-
-pnpm db:reset          supabase db reset, applies all migrations
-
-pnpm seed              deterministic seed with stories
-
-pnpm seed \--no-stories null-data baseline
-
-pnpm test              Phase 2 and Phase 5 tests
-
-pnpm evals             golden set, writes evals/report.md
-
-pnpm dev               next dev
+```
+npm run db:reset               supabase db reset, applies all migrations
+npm run seed                   deterministic seed with stories
+npm run seed -- --no-stories   null-data baseline
+npm test                       Phase 2 and Phase 5 tests
+npm run evals                  golden set twice (episodes off, on), writes evals/report.md
+npm run dev                    next dev
+```
 
 ---
 
 ## 18\. Definition of done, overall
-
-- A teacher persona asks a question about a student not on their roster and gets a scope message; the `run_results` row for that run is empty and `rls.teacher.test` proves the DB returned nothing.  
-- A run with `crash_after = execute` finishes on attempt 2 without re-running `plan`.  
-- `/ops` shows p95 latency, tier 3 rate, and critic fail rate from real runs.  
-- Golden evals pass on seeded data and return nothing interesting on `--no-stories` data.  
-- Every answer shows its SQL and its caveats.  
+- A teacher persona asks a question about a student not on their roster and gets a scope message; the `run_results` row for that run is empty and `rls.teacher.test` proves the DB returned nothing.
+- A run with `crash_after = execute` finishes on attempt 2 without re-running `sketch`, `plan`, or `execute`.
+- A run whose worker died is picked up by `ops.redispatch()` within one minute, with no webhook configured anywhere.
+- `/ops` shows p95 latency, tier 3 rate, critic fail rate, month-to-date tokens, and episode stats from real runs.
+- Golden evals pass on seeded data and return nothing interesting on `--no-stories` data. `evals/report.md` shows both passes, episodes off and on, with the delta as measured.
+- A user can reopen a past thread and ask what they asked about a student. "This student" with no name yields a clarification built from their own history.
+- No table in `memory` contains a student name or a result row.
+- Every answer shows its SQL and its caveats.
 - README has a section titled "What tap data can and cannot tell you."
+
+---
+
+## 19\. Changes in v1.1 (October 18, 2026)
+
+1. Transport and infrastructure: removed Supabase Database Webhooks, Realtime, pgvector, the embeddings API, and the prompt hash. Added the worker ping from `/api/ask`, `ops.redispatch()` on pg_cron every minute for runs queued over 1 minute or running with a heartbeat over 2 minutes, UI polling of `/api/runs/[id]`, `MONTHLY_TOKEN_BUDGET` and `RUN_TOKEN_CAP`, `git_sha` on every run and LLM call, the LLM wrapper in 4.12, and markdown rendering with raw HTML off.
+2. `memory.semantic_notes` renamed to `memory.domain_notes`. It is curated domain knowledge loaded into the planner prompt. Nothing in code or docs is called "semantic memory".
+3. Episodic memory stays, without vectors: new `episodes` and `episode_feedback` shapes, a `sketch` node before `plan` whose output is only the retrieval key, retrieval by metric overlap and shape with trigram fill, scoring rules, a two-pass eval report, and episode stats in `/ops`.
+4. History question shape: `ops.run_entities`, `analytics.v_my_history`, the `my_history` metric, clarification from history for "this student", and a thread list in the UI.
+5. The entity resolution contract in 4.5a is final and unchanged. Code decides ties, the LLM only extracts names and constraints, and the two post-planner checks stay.
