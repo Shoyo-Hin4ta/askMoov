@@ -151,11 +151,19 @@ export async function insertRunEntities(runId: string, entities: { type: string;
   }
 }
 
-export async function saveOutput(runId: string, o: { answer_md: string; viz: unknown; caveats: unknown; steps: unknown; plan: unknown }): Promise<void> {
+/** `labels`: names for the id columns of the result rows, { column: { id: label } }, resolved as the asking persona. */
+export async function saveOutput(runId: string, o: { answer_md: string; viz: unknown; caveats: unknown; steps: unknown; plan: unknown; labels: unknown }): Promise<void> {
   await pool().query(
-    "INSERT INTO ops.run_output (run_id, answer_md, viz, caveats, steps, plan) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (run_id) DO UPDATE SET answer_md = EXCLUDED.answer_md, viz = EXCLUDED.viz, caveats = EXCLUDED.caveats, steps = EXCLUDED.steps, plan = EXCLUDED.plan",
-    [runId, o.answer_md, JSON.stringify(o.viz ?? null), JSON.stringify(o.caveats ?? []), JSON.stringify(o.steps ?? []), JSON.stringify(o.plan ?? null)],
+    "INSERT INTO ops.run_output (run_id, answer_md, viz, caveats, steps, plan, labels) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (run_id) DO UPDATE SET answer_md = EXCLUDED.answer_md, viz = EXCLUDED.viz, caveats = EXCLUDED.caveats, steps = EXCLUDED.steps, plan = EXCLUDED.plan, labels = EXCLUDED.labels",
+    [runId, o.answer_md, JSON.stringify(o.viz ?? null), JSON.stringify(o.caveats ?? []), JSON.stringify(o.steps ?? []), JSON.stringify(o.plan ?? null), JSON.stringify(o.labels ?? {})],
   );
+}
+
+/** The thumbs stored for a run, if any: the latest feedback row (one user per run). */
+export async function runVote(runId: string): Promise<1 | -1 | null> {
+  const r = await pool().query("SELECT vote FROM memory.episode_feedback WHERE run_id = $1 ORDER BY created_at DESC LIMIT 1", [runId]);
+  const v = r.rows[0]?.["vote"];
+  return v === 1 || v === -1 ? v : null;
 }
 
 export async function getRun(id: string): Promise<RunRow | null> {
@@ -171,9 +179,10 @@ export async function getRunView(id: string): Promise<Record<string, unknown> | 
   const view: Record<string, unknown> = {
     id: run.id, thread_id: run.thread_id, status: run.status, current_node: run.current_node, attempt: run.attempt, error: run.error, question: run.question,
     trail: steps.rows,
+    vote: await runVote(id),
   };
   if (run.status === "succeeded") {
-    const out = await pool().query("SELECT answer_md, viz, caveats, steps, plan FROM ops.run_output WHERE run_id = $1", [id]);
+    const out = await pool().query("SELECT answer_md, viz, caveats, steps, plan, labels FROM ops.run_output WHERE run_id = $1", [id]);
     const o = out.rows[0];
     if (o) {
       const results = await pool().query("SELECT step_id, columns, row_count, rows FROM ops.run_results WHERE run_id = $1", [id]);

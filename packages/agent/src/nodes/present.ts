@@ -4,7 +4,7 @@ import { LlmParseError, VizValidationError } from "../errors";
 import { MODELS, type MessageParam } from "../llm";
 import { presenterSystem } from "../prompts";
 import type { State, StateUpdate, StepResult } from "../state";
-import { errorText, isFatal, runBudget, summarizeSteps } from "./shared";
+import { entitiesText, errorText, isFatal, runBudget, summarizeSteps } from "./shared";
 
 /**
  * The presenter names the step the chart is drawn from (viz.step) out of the plan's answer_from list; code derives the
@@ -26,7 +26,7 @@ export async function presentNode(state: State, deps: AgentDeps): Promise<StateU
     const candidates = plan.answer_from.map((id) => describeCandidate(id, state.steps[id])).join("\n");
     const base: MessageParam[] = [{
       role: "user",
-      content: `<question>${state.question}</question>\n<steps>\n${summary}\n</steps>\n<caveats>\n${caveats.map((c) => `- ${c}`).join("\n") || "(none)"}\n</caveats>\n<answer_steps>\n${candidates}\n</answer_steps>\n<uncertain>${state.uncertain ? `yes: ${state.critic_verdict?.reason ?? ""}` : "no"}</uncertain>`,
+      content: `<question>${state.question}</question>\n<entities>\n${entitiesText(state)}\n</entities>\n<steps>\n${summary}\n</steps>\n<caveats>\n${caveats.map((c) => `- ${c}`).join("\n") || "(none)"}\n</caveats>\n<answer_steps>\n${candidates}\n</answer_steps>\n<uncertain>${state.uncertain ? `yes: ${state.critic_verdict?.reason ?? ""}` : "no"}</uncertain>`,
     }];
     const schema = presentationFor(plan.answer_from);
     let messages = base;

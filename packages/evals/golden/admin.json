@@ -1,6 +1,6 @@
 [
   { "id": "admin-passes-period-wing", "persona": "admin", "question": "Which period has the most bathroom passes, by wing, this month?",
-    "expect": { "kind": "plan", "metrics": ["pass_count"], "viz_metric": "pass_count", "result": { "row_count_min": 8 } } },
+    "expect": { "kind": "plan", "metrics": ["pass_count"], "viz_metric": "pass_count", "viz_type": "bar", "caveats_include": ["no_wing_group"], "result": { "row_count_min": 8 } } },
   { "id": "admin-out-right-now", "persona": "admin", "question": "Who is out of class right now?",
     "expect": { "kind": "plan", "result": { "row_count_between": [25, 40] } } },
   { "id": "admin-room-214-reader", "persona": "admin", "question": "Was the Room 214 reader online during 3rd period on October 6?",

@@ -7,6 +7,7 @@ import { retrieveEpisodes, templatize, writeEpisode } from "./episodes";
 import { RetryableError } from "./errors";
 import { buildGraph } from "./graph";
 import { startHeartbeat } from "./heartbeat";
+import { entityLabels, mergeLabels, type Labels } from "./labels";
 import { createAnthropicClient, Llm, type LlmClient } from "./llm";
 import { currentSchemaVersion, loadSchemaDoc, type SchemaDoc } from "./schema-doc";
 import { newRunInput, type State } from "./state";
@@ -104,7 +105,7 @@ export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<St
       ? null
       : newRunInput({ run_id: run.id, thread_id: run.thread_id, persona: run.persona, question: run.question, schema_version: doc.version, git_sha: o.gitSha });
     const final = (await graph.invoke(input as never, config)) as State;
-    await complete(run, final, doc.version, o, started, deps.episodes);
+    await complete(run, final, doc.version, o, started, deps);
     return final;
   } catch (e) {
     const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -130,7 +131,8 @@ export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<St
   }
 }
 
-async function complete(run: ops.RunRow, final: State, schemaVersion: string, o: RuntimeOptions, started: number, episodes: AgentDeps["episodes"]): Promise<void> {
+async function complete(run: ops.RunRow, final: State, schemaVersion: string, o: RuntimeOptions, started: number, deps: AgentDeps): Promise<void> {
+  const episodes = deps.episodes;
   if (final.error) {
     await ops.finishRun(run.id, {
       status: "failed", error: final.error, latency_ms: Date.now() - started, path: final.path, uncertain: false, metrics: [],
@@ -145,8 +147,19 @@ async function complete(run: ops.RunRow, final: State, schemaVersion: string, o:
       return { id: s.id, kind: s.kind, status: r?.status, sql: r?.sql, params: r?.params, shape: r?.shape, row_count: r?.row_count, value: r?.value, explanation: r?.explanation, error: r?.error };
     })
     : [];
+  // names for the id columns of every result, resolved through the scoped entity view: the UI draws names, the ids stay in the rows
+  const labels: Labels = {};
+  if (plan?.kind === "plan") {
+    const scoped = (sql: string, params: unknown[]) => deps.scopedQuery(run.persona, sql, params).then((x) => x.rows);
+    for (const s of plan.steps) {
+      const r = final.steps[s.id];
+      if (r?.status !== "ok" || !(r.row_count ?? 0) || !r.columns) continue;
+      const { rows } = await deps.results.get(run.id, s.id);
+      mergeLabels(labels, await entityLabels(scoped, r.columns, rows));
+    }
+  }
   await ops.insertRunEntities(run.id, final.resolved.entities);
-  await ops.saveOutput(run.id, { answer_md: final.answer ?? "", viz: final.viz, caveats: final.caveats, steps, plan });
+  await ops.saveOutput(run.id, { answer_md: final.answer ?? "", viz: final.viz, caveats: final.caveats, steps, plan, labels });
 
   let episodeId: number | null = null;
   if (episodes && plan?.kind === "plan") {

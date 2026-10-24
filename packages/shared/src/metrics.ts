@@ -89,11 +89,11 @@ export const FILTER_VALUES = {
 const filterValues: Partial<Record<FilterKey, readonly string[]>> = FILTER_VALUES;
 const describeFilter = (f: FilterKey): string => (filterValues[f] ? `${f} (${filterValues[f].join("|")})` : f);
 
-export const SHAPES = ["scalar", "series", "categories", "entity_by_day", "rows"] as const;
+export const SHAPES = ["scalar", "series", "categories", "grouped", "entity_by_day", "rows"] as const;
 export const Shape = z.enum(SHAPES);
 export type Shape = z.infer<typeof Shape>;
 
-export type CaveatKind = "inferred_from_next_tap" | "reader_offline_in_window" | "scope_limited" | "no_exit_kiosk";
+export type CaveatKind = "inferred_from_next_tap" | "reader_offline_in_window" | "scope_limited" | "no_exit_kiosk" | "no_wing_group";
 
 export type MetricDef = {
   metric: Metric;

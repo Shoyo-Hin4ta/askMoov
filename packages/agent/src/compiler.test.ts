@@ -79,8 +79,16 @@ describe("compiler", () => {
     expect(compile(REPRESENTATIVE_SPECS["attendance_rate_by_week"]!, admin).shape).toBe("series");
     expect(compile(REPRESENTATIVE_SPECS["present_count_calendar"]!, admin).shape).toBe("entity_by_day");
     expect(compile(REPRESENTATIVE_SPECS["out_minutes_top"]!, admin).shape).toBe("categories");
-    expect(compile(REPRESENTATIVE_SPECS["pass_count_by_period_wing"]!, admin).shape).toBe("rows");
+    expect(compile(REPRESENTATIVE_SPECS["pass_count_by_period_wing"]!, admin).shape).toBe("grouped");
     expect(compile(REPRESENTATIVE_SPECS["who_was_where"]!, admin).shape).toBe("rows");
+    const range = { start: "2026-10-01", end: "2026-10-13" };
+    expect(compile({ metric: "pass_count", time_range: range, group_by: ["week", "wing"] }, admin).shape).toBe("rows"); // a category over time has no chart yet
+    expect(compile({ metric: "absent_count", time_range: range, group_by: ["period", "wing"] }, admin).shape).toBe("grouped");
+  });
+
+  it("grouping by wing carries the caveat that rooms outside the wings form an empty group", () => {
+    expect(compile(REPRESENTATIVE_SPECS["pass_count_by_period_wing"]!, admin).caveats).toContain("no_wing_group");
+    expect(compile(REPRESENTATIVE_SPECS["out_minutes_top"]!, admin).caveats).not.toContain("no_wing_group");
   });
 
   it("flags inferred metrics", () => {

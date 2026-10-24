@@ -50,6 +50,7 @@ export function vizTypeForShape(shape: Shape): VizType {
     case "scalar": return "stat";
     case "series": return "line";
     case "categories": return "bar";
+    case "grouped": return "bar";
     case "entity_by_day": return "calendar";
     case "rows": return "table";
   }

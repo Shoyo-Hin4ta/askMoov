@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answerStepId, chartStepId } from "./viz";
+import { answerStepId, chartStepId, vizTypeForShape } from "./viz";
 
 describe("chartStepId", () => {
   const of = (id: string) => ({ a: "rows", b: "rows" } as Record<string, string>)[id];
@@ -22,5 +22,16 @@ describe("answerStepId (positional fallback)", () => {
     expect(answerStepId(["b"], of)).toBe("b");
     expect(answerStepId(["b", "x"], of)).toBe("x");
     expect(answerStepId([], of)).toBeUndefined();
+  });
+});
+
+describe("vizTypeForShape", () => {
+  it("maps every shape; a two-dimension breakdown is a (grouped) bar, not a table", () => {
+    expect(vizTypeForShape("scalar")).toBe("stat");
+    expect(vizTypeForShape("series")).toBe("line");
+    expect(vizTypeForShape("categories")).toBe("bar");
+    expect(vizTypeForShape("grouped")).toBe("bar");
+    expect(vizTypeForShape("entity_by_day")).toBe("calendar");
+    expect(vizTypeForShape("rows")).toBe("table");
   });
 });

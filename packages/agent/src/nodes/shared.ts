@@ -1,7 +1,9 @@
-import { chartStepId, RUN_TIME_BUDGET_MS, type Plan, type Shape, type VizSpec } from "@ask-moov/shared";
+import { chartStepId, metricDef, RUN_TIME_BUDGET_MS, type Plan, type Shape, type Step, type VizSpec } from "@ask-moov/shared";
 import type { AgentDeps, Row } from "../deps";
 import type { State, StepResult, Caveat } from "../state";
 import { AgentError } from "../errors";
+import { isSummable, stepFacts, type Facts } from "../facts";
+import { entityLabels, withLabels } from "../labels";
 import type { ChatMessage } from "../state";
 
 export const CAVEAT_TEXT: Record<string, string> = {
@@ -9,6 +11,7 @@ export const CAVEAT_TEXT: Record<string, string> = {
   scope_limited: "Results cover only the sections and students in your scope.",
   reader_offline_in_window: "A reader was offline during part of this window, so some taps are missing rather than absent.",
   no_exit_kiosk: "This school has no exit kiosk. Leaving the building is inferred from the absence of later taps.",
+  no_wing_group: "Rooms outside the wings (the gym, cafeteria, library, offices and entrances) have no wing; their rows appear under an empty wing, shown as \"No wing\".",
 };
 
 export function caveat(kind: string, stepId?: string): Caveat {
@@ -58,10 +61,25 @@ export function threadMessages(state: State, limit = 10): { role: "user" | "assi
 
 export const SAMPLE_ROWS = 5;
 
-/** What the critic and presenter see per step: counts, columns, a few rows, the scalar. Never the full result. */
+/** The ids the plan used, with their names, for the critic and the presenter: "school 1: Springfield High". */
+export function entitiesText(state: State): string {
+  return state.resolved.entities.map((e) => `- ${e.type} ${e.id}: ${e.label}${e.detail ? ` (${e.detail})` : ""}`).join("\n") || "(none)";
+}
+
+/** Whether a step's value sums across rows: a registry count or sum does; averages, rates, distinct counts and model SQL do not. */
+function summable(step: Step): boolean {
+  return step.kind === "spec" && isSummable(metricDef(step.spec.metric).expression);
+}
+
+/**
+ * What the critic and presenter see per step: counts, columns, a few rows with ids written as "Name (id)", the scalar, and
+ * a facts block code computed over the full result (peak, low, total, first and last, top per series, empty dimensions).
+ * Never the full result: the model reads the shape of the data, it does not scan it.
+ */
 export async function summarizeSteps(state: State, deps: AgentDeps): Promise<string> {
   const plan = state.plan_output;
   if (!plan || plan.kind !== "plan") return "";
+  const scoped = (sql: string, params: unknown[]) => deps.scopedQuery(state.persona, sql, params).then((x) => x.rows);
   const parts: string[] = [];
   for (const step of plan.steps) {
     const r: StepResult | undefined = state.steps[step.id];
@@ -74,11 +92,15 @@ export async function summarizeSteps(state: State, deps: AgentDeps): Promise<str
     else if (step.kind === "calc") body = `value: ${JSON.stringify(r.value)} (${r.explanation ?? ""})`;
     else {
       let sample: Row[] = [];
+      let facts: Facts | null = null;
       if ((r.row_count ?? 0) > 0) {
         const { rows } = await deps.results.get(state.run_id, step.id);
-        sample = rows.slice(0, SAMPLE_ROWS);
+        const columns = r.columns ?? [];
+        const labelled = withLabels(rows, await entityLabels(scoped, columns, rows));
+        sample = labelled.slice(0, SAMPLE_ROWS);
+        facts = stepFacts(columns, labelled, r.shape, summable(step));
       }
-      body = `row_count: ${r.row_count ?? 0}\ncolumns: ${(r.columns ?? []).join(", ")}\n${r.value !== undefined ? `value: ${JSON.stringify(r.value)}\n` : ""}sample_rows: ${JSON.stringify(sample)}`;
+      body = `row_count: ${r.row_count ?? 0}\ncolumns: ${(r.columns ?? []).join(", ")}\n${r.value !== undefined ? `value: ${JSON.stringify(r.value)}\n` : ""}sample_rows: ${JSON.stringify(sample)}\nfacts: ${facts ? JSON.stringify(facts) : "(no rows)"}`;
     }
     parts.push([head, def, sql, body, "</step>"].filter(Boolean).join("\n"));
   }

@@ -322,13 +322,15 @@ LIMIT 100",
 
 exports[`compiler > snapshot: pass_count_by_period_wing 1`] = `
 {
-  "caveats": [],
+  "caveats": [
+    "no_wing_group",
+  ],
   "params": [
     "2026-09-14",
     "2026-10-13",
     "bathroom",
   ],
-  "shape": "rows",
+  "shape": "grouped",
   "sql": "SELECT
   period AS period,
   wing AS wing,

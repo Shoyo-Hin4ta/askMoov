@@ -172,6 +172,8 @@ export function compile(spec: Spec, persona: Persona): Compiled {
     if (persona.role === "admin") where.push(`school_id = ${p.add(persona.school_id)}`);
   }
   if (def.caveat) caveats.push(def.caveat);
+  // rooms outside the wings (gym, cafeteria, library, offices, entrances) have a null wing; the reader must be told what that group is
+  if (groupBy.includes("wing")) caveats.push("no_wing_group");
 
   const from = `analytics.${def.view}`;
   const whereSql = where.join("\n  AND ");
@@ -223,6 +225,8 @@ function shapeOf(spec: Spec, groupBy: GroupBy[]): Shape {
   const isDayCalendar = groupBy.includes("day") && (groupBy.length === 1 ? spec.entity?.type === "student" : groupBy.length === 2 && groupBy.includes("student"));
   if (isDayCalendar) return "entity_by_day";
   if (groupBy.length === 1) return TIME_BUCKETS.includes(groupBy[0]!) ? "series" : "categories";
+  // two categories ("by wing, by period") draw as a grouped bar; a category over time stays a table until there is a grouped line
+  if (groupBy.length === 2 && !groupBy.some((g) => TIME_BUCKETS.includes(g))) return "grouped";
   return "rows";
 }
 
