@@ -11,7 +11,7 @@
     "build": "npm run build --workspace apps/web",
     "lint": "npm run lint --workspace apps/web",
     "test": "vitest run",
-    "typecheck": "for p in packages/shared packages/agent packages/db packages/evals; do tsc -p $p || exit 1; done && tsc -p apps/web",
+    "typecheck": "for p in packages/shared packages/agent packages/db packages/evals; do tsc -p $p || exit 1; done && tsc -p apps/web && tsc -p apps/web/tsconfig.test.json",
     "db:new": "supabase migration new",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset --linked",
