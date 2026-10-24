@@ -1,6 +1,6 @@
 # Ask MOOV: handoff (written 2026-10-24 01:10 UTC)
 
-Spec: `docs/ask-moov-design.md` (v1.1; the v1.2 batch is listed at the bottom of `docs/PLAN.md` and waits on Ritik). Checklist and status: `docs/PLAN.md`. Narrative of every decision and gotcha: `docs/sessions/2026-10-22.md` and `docs/sessions/2026-10-23.md`. Rules for working here: `CLAUDE.md` (read its "API constraints learned the hard way").
+Spec: `docs/ask-moov-design.md` (v1.2, October 24, 2026; section 20 lists every change since v1.1). Checklist and status: `docs/PLAN.md`. Narrative of every decision and gotcha: `docs/sessions/2026-10-22.md` and `docs/sessions/2026-10-23.md`. Rules for working here: `CLAUDE.md` (read its "API constraints learned the hard way").
 
 ## What exists and is verified
 - Monorepo (npm workspaces): `packages/shared` (Zod schemas, 20-metric registry, personas), `packages/agent` (LangGraph graph sketch → plan → execute → critique → present; compiler, parser-based SQL validator, LLM wrapper, tools, episodes, heartbeat, runtime), `packages/db` (pools, ops data access, seed, role and Vault setup, authorization tests), `packages/evals` (90-case golden set, two-pass runner), `apps/web` (Next.js 16: `/api/ask`, `/api/worker`, `/api/runs/[id]`, `/api/runs/[id]/feedback`, `/api/threads`, `/api/threads/[id]`, chat UI, `/ops`).
@@ -50,7 +50,6 @@ None known. Residual facts worth knowing:
 
 ## Not done (by decision or not reached)
 - Null-data baseline (`npm run seed -- --no-stories`, `npm run evals -- --label no-stories`, reseed with stories): two reseeds plus one pass, about 45 minutes and $4; needs Ritik's go because it replaces the seed twice.
-- Design doc v1.2 batch: the list at the bottom of `docs/PLAN.md`, waiting on Ritik's go.
 - CI on a seeded Supabase branch: branching is a paid feature; skipped.
 
 ## Deployed

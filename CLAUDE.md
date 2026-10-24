@@ -1,6 +1,6 @@
 # Ask MOOV: rules for working in this repo
 
-Spec: `docs/ask-moov-design.md` (the design, v1.1). Checklist: `docs/PLAN.md`. Session logs: `docs/sessions/YYYY-MM-DD.md`.
+Spec: `docs/ask-moov-design.md` (the design, v1.2). Checklist: `docs/PLAN.md`. Session logs: `docs/sessions/YYYY-MM-DD.md`.
 
 ## What this is
 An analytics agent over synthetic school tap data. The LLM fills in a typed plan; code compiles, validates, runs, and presents. Postgres RLS is the security boundary. The agent is the product; the data is the stage.
