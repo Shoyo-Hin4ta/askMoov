@@ -1,0 +1,492 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler > snapshot: absent_count 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    42,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  (count(*) filter (where status = 'absent'))::int AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND section_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: attendance_rate_by_week 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  date_trunc('week', date)::date AS week,
+  avg(case when status in ('present','tardy') then 1.0 else 0.0 end) AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND student_id = $3
+GROUP BY 1
+ORDER BY week ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: attendance_rate_section 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    42,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  avg(case when status in ('present','tardy') then 1.0 else 0.0 end) AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND section_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: avg_pass_minutes_week 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+    "bathroom",
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  date_trunc('week', started_at)::date AS week,
+  avg(minutes) AS value
+FROM analytics.v_passes
+WHERE started_at >= $1::timestamptz AND started_at < ($2::date + 1)::timestamptz
+  AND student_id = $3
+  AND destination = $4
+GROUP BY 1
+ORDER BY week ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: device_offline_minutes 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    214,
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  (hour)::date AS day,
+  coalesce(sum(offline_minutes), 0) AS value
+FROM analytics.v_device_uptime
+WHERE hour >= $1::timestamptz AND hour < ($2::date + 1)::timestamptz
+  AND room_id = $3
+GROUP BY 1
+ORDER BY day ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: device_uptime 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-10-06",
+    "2026-10-06",
+    214,
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  extract(hour from hour)::int AS hour_bucket,
+  avg(online_ratio) AS value
+FROM analytics.v_device_uptime
+WHERE hour >= $1::timestamptz AND hour < ($2::date + 1)::timestamptz
+  AND room_id = $3
+GROUP BY 1
+ORDER BY hour_bucket ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: dwell_minutes 1`] = `
+{
+  "caveats": [
+    "inferred_from_next_tap",
+  ],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "categories",
+  "sql": "SELECT
+  location_id AS room,
+  coalesce(sum(extract(epoch from (left_by - arrived_at)) / 60.0), 0) AS value
+FROM analytics.v_presence
+WHERE arrived_at >= $1::timestamptz AND arrived_at < ($2::date + 1)::timestamptz
+  AND student_id = $3
+GROUP BY 1
+ORDER BY value DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: entity_list_ref_resolved 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    [
+      1203,
+      1204,
+      1205,
+    ],
+  ],
+  "shape": "categories",
+  "sql": "SELECT
+  student_id AS student,
+  avg(case when status in ('present','tardy') then 1.0 else 0.0 end) AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND student_id = ANY($3)
+GROUP BY 1
+ORDER BY value DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: entry_count_minute 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  to_char(date_trunc('hour', ts) + make_interval(mins => (extract(minute from ts)::int / 5) * 5), 'HH24:MI') AS minute_bucket,
+  count(*)::int AS value
+FROM analytics.v_entry
+WHERE ts >= $1::timestamptz AND ts < ($2::date + 1)::timestamptz
+GROUP BY 1
+ORDER BY minute_bucket ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: last_known_location 1`] = `
+{
+  "caveats": [
+    "inferred_from_next_tap",
+  ],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+    "2026-10-13T10:40:00Z",
+  ],
+  "shape": "rows",
+  "sql": "SELECT DISTINCT ON (student_id)
+  student_id, location, location_kind, arrived_at, left_by, left_by_kind
+FROM analytics.v_presence
+WHERE arrived_at <= $4
+  AND arrived_at >= $1::timestamptz AND arrived_at < ($2::date + 1)::timestamptz
+  AND student_id = $3
+ORDER BY student_id, arrived_at DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: my_history 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    "student",
+    [
+      "1203",
+    ],
+  ],
+  "shape": "rows",
+  "sql": "SELECT run_id, thread_id, min(asked_at) AS asked_at, question, string_agg(DISTINCT entity_label, ', ' ORDER BY entity_label) AS entities, metrics, answer_excerpt
+FROM analytics.v_my_history
+WHERE asked_at >= $1::timestamptz AND asked_at < ($2::date + 1)::timestamptz
+  AND entity_type = $3 AND entity_id = ANY($4)
+GROUP BY run_id, thread_id, question, metrics, answer_excerpt
+ORDER BY asked_at DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: no_card_entries 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  (count(*) filter (where result = 'no_card'))::int AS value
+FROM analytics.v_entry
+WHERE ts >= $1::timestamptz AND ts < ($2::date + 1)::timestamptz
+  AND student_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: out_minutes_top 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+  ],
+  "shape": "categories",
+  "sql": "SELECT
+  student_id AS student,
+  coalesce(sum(minutes), 0) AS value
+FROM analytics.v_passes
+WHERE started_at >= $1::timestamptz AND started_at < ($2::date + 1)::timestamptz
+GROUP BY 1
+ORDER BY value DESC
+LIMIT 10",
+}
+`;
+
+exports[`compiler > snapshot: override_count 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    17,
+  ],
+  "shape": "categories",
+  "sql": "SELECT
+  student_id AS student,
+  (count(*) filter (where source = 'manual'))::int AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND teacher_id = $3
+GROUP BY 1
+ORDER BY value DESC
+LIMIT 10",
+}
+`;
+
+exports[`compiler > snapshot: pass_count_ab 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+    "A",
+    [
+      2,
+    ],
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  count(*)::int AS value
+FROM analytics.v_passes
+WHERE started_at >= $1::timestamptz AND started_at < ($2::date + 1)::timestamptz
+  AND student_id = $3
+  AND ab_day = $4
+  AND extract(isodow from started_at)::int = ANY($5)
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: pass_count_by_period_wing 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    "bathroom",
+  ],
+  "shape": "rows",
+  "sql": "SELECT
+  period AS period,
+  wing AS wing,
+  count(*)::int AS value
+FROM analytics.v_passes
+WHERE started_at >= $1::timestamptz AND started_at < ($2::date + 1)::timestamptz
+  AND destination = $3
+GROUP BY 1, 2
+ORDER BY value DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: present_count_calendar 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "entity_by_day",
+  "sql": "SELECT
+  (date)::date AS day,
+  (count(*) filter (where status in ('present','tardy')))::int AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND student_id = $3
+GROUP BY 1
+ORDER BY day ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: scheduled_count 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  count(*)::int AS value
+FROM analytics.v_attendance_daily
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND student_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: students_at_location 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-10-12",
+    "2026-10-12",
+    185,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  count(distinct student_id)::int AS value
+FROM analytics.v_presence
+WHERE arrived_at >= $1::timestamptz AND arrived_at < ($2::date + 1)::timestamptz
+  AND location_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: tardy_count_by_week 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+    "entry",
+  ],
+  "shape": "series",
+  "sql": "SELECT
+  date_trunc('week', date)::date AS week,
+  count(*)::int AS value
+FROM analytics.v_tardies
+WHERE date >= $1::date AND date < ($2::date + 1)
+  AND student_id = $3
+  AND kind = $4
+GROUP BY 1
+ORDER BY week ASC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: temp_id_count 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    1203,
+  ],
+  "shape": "scalar",
+  "sql": "SELECT
+  (count(*) filter (where type = 'temp'))::int AS value
+FROM analytics.v_cards
+WHERE issued_at >= $1::timestamptz AND issued_at < ($2::date + 1)::timestamptz
+  AND student_id = $3
+ORDER BY 1
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: visits_to_location 1`] = `
+{
+  "caveats": [],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    "Gym",
+  ],
+  "shape": "categories",
+  "sql": "SELECT
+  student_id AS student,
+  count(*)::int AS value
+FROM analytics.v_presence
+WHERE arrived_at >= $1::timestamptz AND arrived_at < ($2::date + 1)::timestamptz
+  AND location = $3
+GROUP BY 1
+ORDER BY value DESC
+LIMIT 100",
+}
+`;
+
+exports[`compiler > snapshot: who_was_where 1`] = `
+{
+  "caveats": [
+    "inferred_from_next_tap",
+  ],
+  "params": [
+    "2026-09-14",
+    "2026-10-13",
+    "2026-10-13T14:10:00Z",
+    "Gym",
+  ],
+  "shape": "rows",
+  "sql": "SELECT student_id, location, arrived_at, left_by, left_by_kind
+FROM (
+  SELECT DISTINCT ON (student_id) student_id, location, arrived_at, left_by, left_by_kind
+  FROM analytics.v_presence
+  WHERE arrived_at <= $3
+    AND arrived_at >= $1::timestamptz AND arrived_at < ($2::date + 1)::timestamptz
+  ORDER BY student_id, arrived_at DESC
+) last
+WHERE location = $4
+  AND (left_by IS NULL OR left_by > $3)
+ORDER BY arrived_at DESC
+LIMIT 100",
+}
+`;

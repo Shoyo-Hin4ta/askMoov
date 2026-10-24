@@ -1,0 +1,19 @@
+{
+  "name": "@ask-moov/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "@ask-moov/db": "*",
+    "@ask-moov/shared": "*",
+    "@langchain/core": "^1.2.20",
+    "@langchain/langgraph": "^1.5.2",
+    "@langchain/langgraph-checkpoint-postgres": "^1.1.2",
+    "libpg-query": "^18.1.5",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": { "@types/pg": "^8.23.1" }
+}
