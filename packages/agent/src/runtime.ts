@@ -32,6 +32,25 @@ export type RuntimeOptions = {
 
 const MAX_ATTEMPTS = 3;
 type AppQuery = (sql: string, params: unknown[]) => Promise<Record<string, unknown>[]>;
+
+/**
+ * Trace writes started without being awaited, so a model round never waits on a database insert. The run awaits them all
+ * before it is marked finished, so "succeeded" still means "fully recorded"; a failed write fails the run, loudly.
+ * Every tracked promise gets a handler at once, so a rejection can never be unhandled while the run is still working.
+ */
+export class PendingWrites {
+  readonly #open = new Set<Promise<void>>();
+  readonly #failures: unknown[] = [];
+  track(write: Promise<void>): void {
+    const handled: Promise<void> = write.catch((e: unknown) => { this.#failures.push(e); }).finally(() => { this.#open.delete(handled); });
+    this.#open.add(handled);
+  }
+  async settle(): Promise<void> {
+    await Promise.all([...this.#open]);
+    const first = this.#failures.shift();
+    if (first !== undefined) throw first instanceof Error ? first : new Error(String(first));
+  }
+}
 const appQuery: AppQuery = async (sql, params) => (await getAppPool().query(sql, params)).rows;
 
 let schemaCache: SchemaDoc | null = null;
@@ -53,9 +72,12 @@ export async function frozenNow(): Promise<string> {
   return new Date(rows[0]!["frozen_now"] as string).toISOString();
 }
 
-/** `usedTokens`: what earlier attempts of this run already spent, so the per-run cap spans attempts (design 4.13). */
-export function buildDeps(run: ops.RunRow, doc: SchemaDoc, now: string, o: RuntimeOptions, usedTokens = 0): AgentDeps {
-  const llm = new Llm(o.client ?? (client ??= createAnthropicClient()), { runTokenCap: o.runTokenCap, usedTokens, onCall: (r) => ops.insertLlmCall(run.id, r, o.gitSha) });
+/**
+ * `usedTokens`: what earlier attempts of this run already spent, so the per-run cap spans attempts (design 4.13).
+ * `pending`: model-round trace rows are written through it without blocking the next round; the caller settles it before finishing.
+ */
+export function buildDeps(run: ops.RunRow, doc: SchemaDoc, now: string, o: RuntimeOptions, usedTokens = 0, pending = new PendingWrites()): AgentDeps {
+  const llm = new Llm(o.client ?? (client ??= createAnthropicClient()), { runTokenCap: o.runTokenCap, usedTokens, onCall: (r) => { pending.track(ops.insertLlmCall(run.id, r, o.gitSha)); } });
   return {
     llm,
     schemaDoc: doc,
@@ -84,6 +106,7 @@ export function buildDeps(run: ops.RunRow, doc: SchemaDoc, now: string, o: Runti
 /** The whole lifecycle for one claimed run: graph (fresh or resumed), outputs, episode, final status, retry mapping. */
 export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<State | null> {
   const started = Date.now();
+  const pending = new PendingWrites();
   // Liveness runs beside the work: the cron reads heartbeat_at from this timer, the UI reads current_node from the node trace.
   const stopHeartbeat = startHeartbeat({
     beat: () => ops.heartbeat(run.id, run.attempt),
@@ -95,7 +118,7 @@ export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<St
   try {
     const [doc, now, usedTokens] = await Promise.all([schemaDoc(), frozenNow(), run.attempt > 1 ? ops.runTokensUsed(run.id) : Promise.resolve(0)]);
     checkpointer ??= createCheckpointer(requireEnv("DATABASE_URL_APP"));
-    const deps = buildDeps(run, doc, now, o, usedTokens);
+    const deps = buildDeps(run, doc, now, o, usedTokens, pending);
     const graph = buildGraph(deps, checkpointer);
     const config = { configurable: { thread_id: run.thread_id } };
     const snapshot = await graph.getState(config);
@@ -105,10 +128,12 @@ export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<St
       ? null
       : newRunInput({ run_id: run.id, thread_id: run.thread_id, persona: run.persona, question: run.question, schema_version: doc.version, git_sha: o.gitSha });
     const final = (await graph.invoke(input as never, config)) as State;
+    await pending.settle(); // every model round is on disk before the run can be called finished
     await complete(run, final, doc.version, o, started, deps);
     return final;
   } catch (e) {
     const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    await pending.settle().catch(() => undefined); // the original error explains the run; the trace rows still land first
     try {
       if (e instanceof RetryableError && run.attempt < MAX_ATTEMPTS) {
         await ops.requeueRun(run.id, message);

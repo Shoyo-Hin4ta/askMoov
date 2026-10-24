@@ -30,7 +30,7 @@ export type LlmUsage = {
 
 /** One row of ops.llm_calls. The shape is declared in @ask-moov/db so the data layer does not depend on the agent. */
 export type { LlmCallRecord } from "@ask-moov/db";
-import type { LlmCallRecord } from "@ask-moov/db";
+import type { LlmCallRecord, LlmRequest } from "@ask-moov/db";
 
 export type MessageParam = Anthropic.MessageParam;
 export type TextBlockParam = Anthropic.TextBlockParam;
@@ -113,6 +113,13 @@ export class Llm {
       const timeoutMs = Math.min(this.options.perCallTimeoutMs ?? PER_CALL_TIMEOUT_MS, remaining);
       const signal = AbortSignal.timeout(timeoutMs);
       const started = Date.now();
+      // The transcript: exactly what this round sends, kept with the row so a misbehaving answer can be read back later.
+      const request: LlmRequest = {
+        model: call.model, max_tokens: maxTokens, effort: call.effort ?? "medium", format: Boolean(format),
+        tools: call.tools ? call.tools.map((t) => t.name) : null,
+        system: typeof call.system === "string" ? [call.system] : call.system.map((b) => b.text),
+        messages: messages.slice(),
+      };
       let message: Anthropic.Message;
       try {
         message = await this.client.messages.create({
@@ -125,7 +132,7 @@ export class Llm {
         }, { signal });
       } catch (e) {
         const err = signal.aborted ? new LlmTimeoutError(timeoutMs, Date.now() - started) : mapSdkError(e);
-        await this.record({ node: call.node, model: call.model, prompt_tokens: 0, completion_tokens: 0, cache_read_tokens: 0, latency_ms: Date.now() - started, response_excerpt: "", error: err.message });
+        await this.record({ node: call.node, model: call.model, prompt_tokens: 0, completion_tokens: 0, cache_read_tokens: 0, latency_ms: Date.now() - started, response_excerpt: "", error: err.message, request, response: null, stop_reason: null });
         throw err;
       }
       const roundMs = Date.now() - started;
@@ -171,6 +178,7 @@ export class Llm {
         latency_ms: roundMs,
         response_excerpt: (text || toolUses.map((t) => `${t.name}(${JSON.stringify(t.input)})`).join("; ")).slice(0, 500),
         error: failure?.message ?? null,
+        request, response: message.content, stop_reason: message.stop_reason ?? null,
       });
       if (failure) throw failure;
 

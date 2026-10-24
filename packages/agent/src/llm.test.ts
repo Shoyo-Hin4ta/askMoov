@@ -119,3 +119,42 @@ describe("llm wrapper: the token cap spans attempts", () => {
     expect(records[0]?.error).toMatch(/token cap/);
   });
 });
+
+describe("llm wrapper: the transcript", () => {
+  it("records exactly what was sent and the full content that came back", async () => {
+    const records: LlmCallRecord[] = [];
+    const client: LlmClient = { messages: { create: vi.fn(async () => message({ text: JSON.stringify({ answer: 4 }) })) } };
+    const llm = new Llm(client, { runTokenCap: 1_000_000, onCall: (r) => { records.push(r); } });
+    await llm.callStructured({ node: "critique", model: "claude-opus-5-5", schema: Schema, system: [{ type: "text", text: "rules" }, { type: "text", text: "schema doc" }], messages: [{ role: "user", content: "q" }], effort: "low", max_tokens: 123 });
+    const r = records[0]!;
+    expect(r.request).toEqual({ model: "claude-opus-5-5", max_tokens: 123, effort: "low", format: true, tools: null, system: ["rules", "schema doc"], messages: [{ role: "user", content: "q" }] });
+    expect(r.response).toEqual([{ type: "text", text: JSON.stringify({ answer: 4 }), citations: null }]);
+    expect(r.stop_reason).toBe("end_turn");
+  });
+
+  it("a failed call still records the request, with no response", async () => {
+    const records: LlmCallRecord[] = [];
+    const client: LlmClient = { messages: { create: vi.fn(async () => { throw sdkError(Anthropic.RateLimitError, { status: 429 }); }) } };
+    const llm = new Llm(client, { runTokenCap: 1_000_000, onCall: (r) => { records.push(r); } });
+    await expect(llm.callStructured({ node: "plan", model: "claude-opus-5-5", schema: Schema, system: "s", messages: [{ role: "user", content: "q" }] })).rejects.toBeInstanceOf(RetryableError);
+    expect(records[0]!.request).toMatchObject({ system: ["s"], format: true, tools: null });
+    expect(records[0]!.response).toBeNull();
+    expect(records[0]!.stop_reason).toBeNull();
+  });
+
+  it("the tool round's request carries the messages as they stood, and the next round's carries the tool results", async () => {
+    const records: LlmCallRecord[] = [];
+    const replies = [
+      message({ content: [{ type: "tool_use", id: "tu_1", name: "lookup_entity", input: { type: "student", text: "Bart" } }], stop_reason: "tool_use" } as never),
+      message({}),
+    ];
+    const client: LlmClient = { messages: { create: vi.fn(async () => replies.shift()!) } };
+    const llm = new Llm(client, { runTokenCap: 1_000_000, onCall: (r) => { records.push(r); } });
+    await llm.callStructured({ node: "plan", model: "claude-opus-5-5", schema: Schema, system: "s", messages: [{ role: "user", content: "q" }], tools: [{ name: "lookup_entity", input_schema: { type: "object" } }], onToolUse: async () => ({ id: 1203 }) });
+    expect(records).toHaveLength(2);
+    expect(records[0]!.request!.tools).toEqual(["lookup_entity"]);
+    expect(records[0]!.request!.messages).toHaveLength(1);
+    expect(records[1]!.request!.messages).toHaveLength(3); // user, assistant tool_use, user tool_result
+    expect(records[0]!.stop_reason).toBe("tool_use");
+  });
+});

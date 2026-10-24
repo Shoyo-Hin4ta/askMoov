@@ -1,5 +1,6 @@
 import type { Persona, Pin } from "@ask-moov/shared";
 import { getAppPool } from "./pools";
+import { expandSystemBlocks, splitSystemBlocks, type LlmRequest, type StoredLlmRequest } from "./transcript";
 
 /** Every read and write of the ops schema. One file, plain SQL, app pool. Used by the runtime, the routes and the eval runner. */
 
@@ -20,6 +21,8 @@ export function costUsd(model: string, t: { prompt_tokens: number; completion_to
 export type LlmCallRecord = {
   node: string; model: string; prompt_tokens: number; completion_tokens: number; cache_read_tokens: number;
   latency_ms: number; response_excerpt: string; error: string | null;
+  /** The full transcript of the round: what was sent and the complete content that came back (null when the call itself failed). */
+  request: LlmRequest | null; response: unknown | null; stop_reason: string | null;
 };
 
 export type RunRow = {
@@ -117,11 +120,64 @@ export async function insertStep(r: { run_id: string; node: string; attempt: num
   );
 }
 
+/** Prompt blocks this process has already stored; the schema document and the rules repeat on every round. */
+const knownBlocks = new Set<string>();
+
+/**
+ * One row per model round with its full transcript. Large system blocks go to ops.prompt_blocks once (by content hash;
+ * `ON CONFLICT DO NOTHING` makes a concurrent first write safe) and the request references them; see transcript.ts.
+ */
 export async function insertLlmCall(runId: string, r: LlmCallRecord, gitSha: string): Promise<void> {
+  let request: StoredLlmRequest | null = null;
+  let hashes: string[] = [];
+  if (r.request) {
+    const { system, blocks } = splitSystemBlocks(r.request.system);
+    for (const b of blocks) {
+      if (knownBlocks.has(b.hash)) continue;
+      await pool().query("INSERT INTO ops.prompt_blocks (hash, text, bytes) VALUES ($1, $2, $3) ON CONFLICT (hash) DO NOTHING", [b.hash, b.text, b.bytes]);
+      knownBlocks.add(b.hash);
+    }
+    request = { ...r.request, system };
+    hashes = blocks.map((b) => b.hash);
+  }
   await pool().query(
-    "INSERT INTO ops.llm_calls (run_id, node, model, prompt_tokens, completion_tokens, cache_read_tokens, latency_ms, git_sha, response_excerpt, error) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-    [runId, r.node, r.model, r.prompt_tokens, r.completion_tokens, r.cache_read_tokens, r.latency_ms, gitSha, r.response_excerpt, r.error],
+    `INSERT INTO ops.llm_calls (run_id, node, model, prompt_tokens, completion_tokens, cache_read_tokens, latency_ms, git_sha, response_excerpt, error, request, response, stop_reason, block_hashes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [runId, r.node, r.model, r.prompt_tokens, r.completion_tokens, r.cache_read_tokens, r.latency_ms, gitSha, r.response_excerpt, r.error,
+      request ? JSON.stringify(request) : null, r.response === null || r.response === undefined ? null : JSON.stringify(r.response), r.stop_reason, hashes],
   );
+}
+
+/**
+ * One run, top to bottom, for the run-detail page: the run row, the node trail, every model round with its request expanded
+ * back to full text and its full response, the tool calls, the rows per step and the output. Null when the run does not exist.
+ */
+export async function getRunTrace(id: string): Promise<Record<string, unknown> | null> {
+  const run = (await pool().query("SELECT * FROM ops.runs WHERE id = $1", [id])).rows[0];
+  if (!run) return null;
+  const [steps, calls, tools, results, output] = await Promise.all([
+    pool().query("SELECT node, attempt, started_at, duration_ms, input_summary, output_summary, error FROM ops.run_steps WHERE run_id = $1 ORDER BY started_at", [id]),
+    pool().query("SELECT id, node, model, prompt_tokens, completion_tokens, cache_read_tokens, latency_ms, error, stop_reason, request, response, created_at FROM ops.llm_calls WHERE run_id = $1 ORDER BY created_at, id", [id]),
+    pool().query("SELECT node, tool, args, result, duration_ms, created_at FROM ops.tool_calls WHERE run_id = $1 ORDER BY created_at, id", [id]),
+    pool().query("SELECT step_id, columns, row_count, rows FROM ops.run_results WHERE run_id = $1 ORDER BY step_id", [id]),
+    pool().query("SELECT answer_md, viz, caveats, steps, plan, labels FROM ops.run_output WHERE run_id = $1", [id]),
+  ]);
+  const hashes = new Set<string>();
+  for (const c of calls.rows) for (const b of ((c["request"] as StoredLlmRequest | null)?.system ?? [])) if ("hash" in b) hashes.add(b.hash);
+  const texts: Record<string, string> = {};
+  if (hashes.size > 0) {
+    const blocks = await pool().query("SELECT hash, text FROM ops.prompt_blocks WHERE hash = ANY($1::text[])", [[...hashes]]);
+    for (const b of blocks.rows) texts[String(b["hash"])] = String(b["text"]);
+  }
+  const llm_calls = calls.rows.map((c) => {
+    const req = c["request"] as StoredLlmRequest | null;
+    return { ...c, request: req ? { ...req, system: expandSystemBlocks(req.system, texts) } : null };
+  });
+  return {
+    run, trail: steps.rows, llm_calls, tool_calls: tools.rows,
+    results: Object.fromEntries(results.rows.map((r) => [r["step_id"], { columns: r["columns"], row_count: r["row_count"], rows: r["rows"] }])),
+    output: output.rows[0] ?? null,
+  };
 }
 
 export async function insertToolCall(r: { run_id: string; node: string; tool: string; args: unknown; result: unknown; duration_ms: number }): Promise<void> {
