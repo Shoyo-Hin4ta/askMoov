@@ -45,6 +45,15 @@ function formatTimestamp(iso: string): string {
   return MIDNIGHT.test(iso) ? iso.slice(0, 10) : iso.replace("T", " ").slice(0, 16);
 }
 
+/** What a table shows for a missing value. */
+export const EMPTY_CELL = "\u2014";
+
+/** A fraction as a percentage with one decimal: 0.921 to "92.1%", -0.02 to "-2.0%". The sign comes from the number itself. */
+export function formatPercent(fraction: number): string {
+  const tenths = Math.round(fraction * 1000) / 10;
+  return `${(Object.is(tenths, -0) ? 0 : tenths).toFixed(1)}%`;
+}
+
 /** Large standalone figures: 12.9K from 10,000 up, plain grouped digits below. */
 export function formatCompact(n: number): string {
   return Math.abs(n) >= 10_000 ? COMPACT.format(n) : NUMBER.format(n);

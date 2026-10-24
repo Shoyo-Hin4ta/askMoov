@@ -1,9 +1,8 @@
 import { getRunTrace } from "@ask-moov/db";
+import { isRunId } from "@/lib/run-id";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * One run top to bottom for the run-detail page: the run row, the node trail, every model round with its full request and
@@ -11,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await ctx.params;
-  if (!UUID.test(id)) return Response.json({ error: "bad run id" }, { status: 400 });
+  if (!isRunId(id)) return Response.json({ error: "bad run id" }, { status: 400 });
   const trace = await getRunTrace(id);
   return trace ? Response.json(trace) : Response.json({ error: "not found" }, { status: 404 });
 }

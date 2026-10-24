@@ -6,9 +6,9 @@ import { cn } from "./cn";
 export function Disclosure({ summary, children, className }: { summary: ReactNode; children: ReactNode; className?: string }) {
   return (
     <details className={cn("group rounded-control border border-line", className)}>
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-medium text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
-        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
-        {summary}
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-1.5 px-3 py-2 text-xs font-medium text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
+        <span className="min-w-0 wrap-anywhere">{summary}</span>
       </summary>
       <div className="border-t border-line px-3 py-3">{children}</div>
     </details>

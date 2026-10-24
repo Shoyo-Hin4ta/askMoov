@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { DataTable, inferColumns } from "@/components/ui/data-table";
+import { inferColumns, type Column } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/ui/page-header";
 import { StatList } from "@/components/ui/stat-list";
-import { formatValue, humanize } from "@/lib/format";
+import { TableCard } from "@/components/ui/table-card";
+import { EMPTY_CELL, formatValue, humanize } from "@/lib/format";
 import { opsTables, type Table } from "@/lib/ops-queries";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +13,7 @@ export default async function OpsPage() {
   const tables = await opsTables();
   return (
     <main className="min-h-dvh bg-page text-ink">
-      <header className="flex h-12 items-center justify-between border-b border-line bg-surface px-4 sm:px-6">
-        <div className="flex items-baseline gap-2">
-          <h1 className="font-semibold">Ask MOOV</h1>
-          <span className="text-sm text-ink-2">Operations</span>
-        </div>
-        <Link href="/" className="text-xs text-ink-2 hover:text-ink">Back to chat</Link>
-      </header>
+      <PageHeader title="Operations" links={[{ href: "/", label: "Back to chat" }, { href: "/schema", label: "Schema" }]} />
       {/* grid-cols-1 gives minmax(0, 1fr); the implicit auto column would let a wide table push the card past the viewport. */}
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-6 lg:grid-cols-2">
         {tables.map((t) => <OpsCard key={t.title} table={t} />)}
@@ -48,10 +43,14 @@ function OpsCard({ table }: { table: Table }) {
       </Card>
     );
   }
-  return (
-    <Card>
-      <CardHeader title={table.title} aside={`${table.rows.length} row${table.rows.length === 1 ? "" : "s"}`} />
-      <DataTable columns={inferColumns(keys, table.rows)} rows={table.rows} label={table.title} className="text-xs" />
-    </Card>
-  );
+  return <TableCard title={table.title} columns={linkRunIds(inferColumns(keys, table.rows))} rows={table.rows} className="text-xs" />;
+}
+
+const RUN_ID_COLUMNS = new Set(["id", "latest_run"]);
+
+/** A run id cell shows its first eight characters, carries the full id in its title, and links to the run's trace. */
+function linkRunIds(columns: Column[]): Column[] {
+  return columns.map((c) => RUN_ID_COLUMNS.has(c.key)
+    ? { ...c, label: c.key === "id" ? "Run" : "Latest run", align: "left", kind: "id", format: (v) => (v ? { text: String(v).slice(0, 8), title: String(v), href: `/ops/runs/${String(v)}` } : { text: EMPTY_CELL }) }
+    : c);
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Activity } from "lucide-react";
+import { Activity, Database } from "lucide-react";
 import type { PersonaKey } from "@ask-moov/shared";
 import type { Thread } from "@/lib/client/api";
 import { PersonaSwitcher } from "./persona-switcher";
@@ -10,6 +10,7 @@ export type SidebarProps = {
   persona: PersonaKey;
   onPersona: (k: PersonaKey) => void;
   threads: Thread[];
+  threadsLoading: boolean;
   threadId: string;
   onOpenThread: (t: Thread) => void;
   onNewThread: () => void;
@@ -21,8 +22,8 @@ export type SidebarProps = {
   action?: ReactNode;
 };
 
-/** Brand, persona switcher, thread list, Operations link. Rendered by the desktop aside and by the phone drawer. No hooks. */
-export function Sidebar({ persona, onPersona, threads, threadId, onOpenThread, onNewThread, groupName, titleId, action }: SidebarProps) {
+/** Brand, persona switcher, thread list, page links. Rendered by the desktop aside and by the phone drawer. No hooks. */
+export function Sidebar({ persona, onPersona, threads, threadsLoading, threadId, onOpenThread, onNewThread, groupName, titleId, action }: SidebarProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-start justify-between gap-2 px-4 pb-3 pt-4">
@@ -35,11 +36,17 @@ export function Sidebar({ persona, onPersona, threads, threadId, onOpenThread, o
       <div className="px-2">
         <PersonaSwitcher value={persona} onChange={onPersona} name={groupName} />
       </div>
-      <ThreadList threads={threads} activeId={threadId} onOpen={onOpenThread} onNew={onNewThread} />
-      <Link href="/ops" className="flex items-center gap-2 border-t border-line px-4 py-3 text-xs text-ink-2 hover:text-ink">
-        <Activity className="h-3.5 w-3.5" aria-hidden />
-        Operations
-      </Link>
+      <ThreadList threads={threads} loading={threadsLoading} activeId={threadId} onOpen={onOpenThread} onNew={onNewThread} />
+      <nav className="flex border-t border-line text-xs text-ink-2" aria-label="Pages">
+        <Link href="/ops" className="flex flex-1 items-center gap-2 px-4 py-3 hover:text-ink">
+          <Activity className="h-3.5 w-3.5" aria-hidden />
+          Operations
+        </Link>
+        <Link href="/schema" className="flex flex-1 items-center gap-2 px-4 py-3 hover:text-ink">
+          <Database className="h-3.5 w-3.5" aria-hidden />
+          Schema
+        </Link>
+      </nav>
     </div>
   );
 }

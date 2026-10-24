@@ -12,7 +12,17 @@
   --line: #dce1e8;
   --line-2: #ebeef2;
   --on-ink: #ffffff;
-  --series: #2a78d6;
+  /* Categorical palette (dataviz reference instance), assigned to series in this fixed order. The empty series is grey. */
+  --cat-1: #2a78d6;
+  --cat-2: #eb6834;
+  --cat-3: #1baf7a;
+  --cat-4: #eda100;
+  --cat-5: #e87ba4;
+  --cat-6: #008300;
+  --cat-7: #6250d6;
+  --cat-8: #e34948;
+  --cat-none: #8a93a3;
+  --series: var(--cat-1);
   --series-soft: #cde2fb;
   --warn: #b45309;
   --danger: #b42318;
@@ -30,7 +40,16 @@
     --line: #2a2f39;
     --line-2: #22262e;
     --on-ink: #0f1115;
-    --series: #3987e5;
+    --cat-1: #3987e5;
+    --cat-2: #d95926;
+    --cat-3: #199e70;
+    --cat-4: #c98500;
+    --cat-5: #d55181;
+    --cat-6: #008300;
+    --cat-7: #9085e9;
+    --cat-8: #e66767;
+    --cat-none: #7c8595;
+    --series: var(--cat-1);
     --series-soft: #1c3a63;
     --warn: #f3a640;
     --danger: #f08c8c;
@@ -54,6 +73,15 @@
   --color-on-ink: var(--on-ink);
   --color-series: var(--series);
   --color-series-soft: var(--series-soft);
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
+  --color-cat-7: var(--cat-7);
+  --color-cat-8: var(--cat-8);
+  --color-cat-none: var(--cat-none);
   --color-warn: var(--warn);
   --color-danger: var(--danger);
 }

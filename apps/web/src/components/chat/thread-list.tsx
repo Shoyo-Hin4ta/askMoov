@@ -4,10 +4,10 @@ import { cn } from "@/components/ui/cn";
 import type { Thread } from "@/lib/client/api";
 import { formatRelative } from "@/lib/format";
 
-type Props = { threads: Thread[]; activeId: string; onOpen: (t: Thread) => void; onNew: () => void };
+type Props = { threads: Thread[]; loading: boolean; activeId: string; onOpen: (t: Thread) => void; onNew: () => void };
 
 /** The persona's past conversations, newest first. Reopening one continues it. */
-export function ThreadList({ threads, activeId, onOpen, onNew }: Props) {
+export function ThreadList({ threads, loading, activeId, onOpen, onNew }: Props) {
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-3 pb-1 pt-4">
@@ -32,7 +32,8 @@ export function ThreadList({ threads, activeId, onOpen, onNew }: Props) {
             </li>
           );
         })}
-        {threads.length === 0 && <li className="px-2 py-3 text-xs text-ink-3">No threads yet. Ask something to start one.</li>}
+        {threads.length === 0 && loading && <li className="px-2 py-3 text-xs text-ink-3" aria-busy="true">Loading threads</li>}
+        {threads.length === 0 && !loading && <li className="px-2 py-3 text-xs text-ink-3">No threads yet. Ask something to start one.</li>}
       </ul>
     </section>
   );

@@ -1,24 +1,39 @@
-import { formatValue, humanize, isNumeric } from "@/lib/format";
+import Link from "next/link";
+import { EMPTY_CELL, formatValue, humanize, isNumeric } from "@/lib/format";
+import { labelFor, type Labels } from "@/lib/labels";
 import { cn } from "./cn";
 
-export type Column = { key: string; label: string; align: "left" | "right"; kind: "text" | "number" | "id" };
+/** href: the cell links there (rendered with next/link, no prefetch). The caller decides which cells link. */
+export type Cell = { text: string; title?: string; href?: string };
+export type Column = { key: string; label: string; align: "left" | "right"; kind: "text" | "number" | "id"; format?: (v: unknown) => Cell };
 export type Row = Record<string, unknown>;
 
 const ID_KEY = /(^|_)id$/;
 
-/** Columns from result keys: numeric columns (by the first non-null value) are right-aligned with tabular figures; id columns stay plain text. */
-export function inferColumns(keys: string[], rows: Row[]): Column[] {
+function idCell(labels: Labels, key: string, v: unknown): Cell {
+  if (v === null || v === undefined || v === "") return { text: EMPTY_CELL };
+  const label = labelFor(labels, key, v);
+  return label ? { text: label, title: `${label} (${String(v)})` } : { text: String(v) };
+}
+
+/**
+ * Columns from result keys. A key the labels map covers, or one ending in "id", is an id column: left-aligned, printed as
+ * its name when known with "Name (id)" in the title. Numeric columns (by the first non-null value) are right-aligned.
+ */
+export function inferColumns(keys: string[], rows: Row[], labels: Labels = {}): Column[] {
   return keys.map((key) => {
-    if (ID_KEY.test(key)) return { key, label: humanize(key), align: "left", kind: "id" };
+    if (key in labels || ID_KEY.test(key)) return { key, label: humanize(key), align: "left", kind: "id", format: (v) => idCell(labels, key, v) };
     const sample = rows.find((r) => r[key] !== null && r[key] !== undefined)?.[key];
     const numeric = sample !== undefined && isNumeric(sample);
     return { key, label: humanize(key), align: numeric ? "right" : "left", kind: numeric ? "number" : "text" };
   });
 }
 
-function cellText(c: Column, v: unknown): string {
-  if (c.kind === "id") return v === null || v === undefined ? "" : String(v);
-  return formatValue(v);
+function cell(c: Column, v: unknown): Cell {
+  if (c.format) return c.format(v);
+  if (v === null || v === undefined) return { text: EMPTY_CELL };
+  const text = formatValue(v);
+  return { text, title: text.length > 24 ? text : undefined };
 }
 
 type Props = { columns: Column[]; rows: Row[]; label: string; maxRows?: number; className?: string };
@@ -42,11 +57,13 @@ export function DataTable({ columns, rows, label, maxRows, className }: Props) {
           {shown.map((r, i) => (
             <tr key={i} className="border-b border-line-2 last:border-0 hover:bg-surface-2">
               {columns.map((c) => {
-                const text = cellText(c, r[c.key]);
+                const { text, title, href } = cell(c, r[c.key]);
                 return (
                   <td key={c.key} className={cn("px-3 py-1.5 text-ink", c.align === "right" ? "text-right tabular-nums" : "text-left")}>
                     {/* max-width is ignored on table cells; the block span is what truncates. */}
-                    <span className="block max-w-[12rem] truncate sm:max-w-md" title={text.length > 24 ? text : undefined}>{text}</span>
+                    <span className="block max-w-[12rem] truncate sm:max-w-md" title={title}>
+                      {href ? <Link href={href} prefetch={false} className="underline decoration-line underline-offset-2 hover:decoration-ink">{text}</Link> : text}
+                    </span>
                   </td>
                 );
               })}

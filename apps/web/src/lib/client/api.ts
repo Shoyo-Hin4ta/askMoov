@@ -1,5 +1,8 @@
 /** Browser-side API client and the shape of what /api/runs/[id] returns. No Supabase key, no secrets, only our own routes. */
 import type { PersonaKey } from "@ask-moov/shared";
+import type { Labels } from "@/lib/labels";
+
+export type { Labels };
 
 export type Trail = { node: string; attempt: number; started_at: string; duration_ms: number; error: string | null }[];
 export type StepOut = { id: string; kind: "spec" | "calc" | "sql"; status?: string; sql?: string; params?: unknown[]; shape?: string; row_count?: number; value?: unknown; explanation?: string; error?: string };
@@ -8,13 +11,18 @@ export type VizOut = { type: "stat" | "line" | "bar" | "calendar" | "table"; tit
 export type ClarificationOption = { label: string; entity?: { type: string; id: number | string; label?: string; detail?: string } };
 /** What a clicked chip sends back: the chosen entity by id. */
 export type Pin = { type: string; id: number | string; label: string; detail?: string };
-export type PlanOut = { kind: "plan"; answer_from: string[]; expected_shape: string } | { kind: "out_of_scope"; reason: string; message: string; suggestion?: string; options?: ClarificationOption[] } | null;
+/** The plan's steps as stored: enough to know a step's metric or formula. */
+export type PlanStep = { id: string; kind: "spec"; spec: { metric: string } } | { id: string; kind: "calc"; formula: string } | { id: string; kind: "sql" };
+export type PlanOut = { kind: "plan"; steps: PlanStep[]; answer_from: string[]; expected_shape: string } | { kind: "out_of_scope"; reason: string; message: string; suggestion?: string; options?: ClarificationOption[] } | null;
 export type Caveat = { kind: string; text: string };
-export type RunOutput = { answer_md: string; viz: VizOut; caveats: Caveat[]; steps: StepOut[]; plan: PlanOut; results: Results };
+/** labels: names for id columns, resolved as the asking persona ({column: {id: label}}); absent on runs stored before it existed. */
+export type RunOutput = { answer_md: string; viz: VizOut; caveats: Caveat[]; steps: StepOut[]; plan: PlanOut; results: Results; labels?: Labels };
 export type RunStatus = "queued" | "running" | "succeeded" | "failed";
 export type RunView = {
   id: string; thread_id: string; status: RunStatus; current_node: string | null; attempt: number; error: string | null; question: string;
   trail: Trail;
+  /** The stored thumbs for this run. */
+  vote: 1 | -1 | null;
   output?: RunOutput;
 };
 export type Thread = { thread_id: string; first_question: string; last_asked_at: string; runs: number };

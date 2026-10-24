@@ -1,5 +1,8 @@
 import type { RunView } from "@/lib/client/api";
 
+/** What the trail needs from a run: the chat passes a RunView, the run-detail page builds this from a trace. */
+export type TrailView = Pick<RunView, "status" | "attempt" | "trail">;
+
 /** The fixed graph, in order. Labels are what a reader does, not node names. */
 const NODE_ORDER = ["sketch", "plan", "execute", "critique", "present"] as const;
 type Node = (typeof NODE_ORDER)[number];
@@ -27,7 +30,7 @@ function label(node: string, n: number): string {
  * so it names the last completed node; the running one is the next in the fixed order. A replan or a further
  * execute step shows as the predicted next node until it finishes and appears in the trail as "Plan 2" or "Run 2".
  */
-export function runningNode(view: RunView | null): Node | null {
+export function runningNode(view: TrailView | null): Node | null {
   if (view?.status !== "running") return null;
   const last = view.trail[view.trail.length - 1]?.node as Node | undefined;
   if (!last) return NODE_ORDER[0];
@@ -36,7 +39,7 @@ export function runningNode(view: RunView | null): Node | null {
 }
 
 /** Finished nodes from the trail, then the running node and what is still expected after it. Repeats are numbered. */
-export function trailEntries(view: RunView | null): TrailEntry[] {
+export function trailEntries(view: TrailView | null): TrailEntry[] {
   const counts: Record<string, number> = {};
   const done: TrailEntry[] = (view?.trail ?? []).map((t) => {
     counts[t.node] = (counts[t.node] ?? 0) + 1;
@@ -54,12 +57,12 @@ export function trailEntries(view: RunView | null): TrailEntry[] {
   return [...done, ...rest];
 }
 
-export function totalMs(view: RunView | null): number {
+export function totalMs(view: TrailView | null): number {
   return (view?.trail ?? []).reduce((sum, t) => sum + (t.duration_ms ?? 0), 0);
 }
 
 /** One line of status text while a run is in flight (design doc 13.3). */
-export function statusLine(view: RunView | null): string {
+export function statusLine(view: TrailView | null): string {
   if (!view) return "Sending the question";
   if (view.status === "queued") return "Waiting for a worker";
   const node = runningNode(view);

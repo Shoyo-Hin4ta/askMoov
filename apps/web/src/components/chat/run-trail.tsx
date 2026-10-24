@@ -1,8 +1,8 @@
 import { ChevronRight } from "lucide-react";
-import type { RunView } from "@/lib/client/api";
+
 import { cn } from "@/components/ui/cn";
 import { formatDuration } from "@/lib/format";
-import { totalMs, trailEntries } from "./trail";
+import { totalMs, trailEntries, type TrailView } from "./trail";
 
 const STATE: Record<string, string> = {
   done: "text-ink",
@@ -12,7 +12,7 @@ const STATE: Record<string, string> = {
 };
 
 /** The run's path through the fixed graph: what ran, how long each node took, what is still to come. */
-export function RunTrail({ view }: { view: RunView | null }) {
+export function RunTrail({ view }: { view: TrailView | null }) {
   const entries = trailEntries(view);
   const total = totalMs(view);
   return (

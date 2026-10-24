@@ -10,7 +10,7 @@ export const EXAMPLES: Record<PersonaKey, string[]> = {
     "How many bathroom passes did Bart take this month?",
     "What's the attendance rate in my 4th period this month?",
     "Show me Ralph's attendance this month",
-    "How many more classes does Lisa need to hit 90%?",
+    "How many more classes does Bart need to hit 90% in my class?",
   ],
   admin: [
     "Which period has the most bathroom passes, by wing?",

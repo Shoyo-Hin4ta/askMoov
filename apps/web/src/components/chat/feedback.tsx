@@ -4,9 +4,9 @@ import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { vote } from "@/lib/client/api";
 
-/** Thumbs up or down, once per answer. The vote scores the episode behind this run. */
-export function Feedback({ runId }: { runId: string }) {
-  const [voted, setVoted] = useState<1 | -1 | null>(null);
+/** Thumbs up or down, once per answer. The vote scores the episode behind this run; a stored vote shows as already cast after a reopen. */
+export function Feedback({ runId, initial }: { runId: string; initial: 1 | -1 | null }) {
+  const [voted, setVoted] = useState<1 | -1 | null>(initial);
   const cast = async (v: 1 | -1) => {
     if (voted !== null) return;
     if (await vote(runId, v)) setVoted(v);

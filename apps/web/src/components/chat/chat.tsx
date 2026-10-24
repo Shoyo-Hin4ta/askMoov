@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { PERSONAS, type PersonaKey } from "@ask-moov/shared";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { threads, refresh } = useThreads(persona);
+  const { threads, loading: threadsLoading, refresh } = useThreads(persona);
   const { messages, busy, submit, reset, open } = useAsk(persona, threadId, refresh);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +45,7 @@ export function Chat() {
   };
   const { name } = personaParts(persona);
   const showExamples = messages.length === 0 || helpOpen;
-  const sidebarProps = { persona, onPersona: startThread, threads, threadId, onOpenThread: openThread, onNewThread: () => startThread() };
+  const sidebarProps = { persona, onPersona: startThread, threads, threadsLoading, threadId, onOpenThread: openThread, onNewThread: () => startThread() };
 
   return (
     <div className="flex h-dvh">
@@ -78,6 +79,10 @@ export function Chat() {
             <span className="lg:hidden">Data as of {DATA_AS_OF_SHORT}</span>
             <span className="hidden lg:inline">Data as of {DATA_AS_OF}</span>
           </time>
+          <nav className="hidden shrink-0 items-center gap-3 text-xs text-ink-2 md:flex" aria-label="Pages">
+            <Link href="/ops" className="hover:text-ink">Operations</Link>
+            <Link href="/schema" className="hover:text-ink">Schema</Link>
+          </nav>
         </header>
 
         <div className="flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-8">
