@@ -49,8 +49,12 @@ None known. Residual facts worth knowing:
 ## Not done (by decision or not reached)
 - Null-data baseline (`npm run seed -- --no-stories`, `npm run evals -- --label no-stories`, reseed with stories): two reseeds plus one pass, about 45 minutes and $4; needs Ritik's go because it replaces the seed twice.
 - Design doc v1.2 batch: the list at the bottom of `docs/PLAN.md`, waiting on Ritik's go.
-- Vercel deployment: set the env vars, deploy, `npm run db:vault -- <url>`, requeue one finished run by hand and watch `net._http_response` return 202 (the one check a laptop cannot do; Vault `app_url` is localhost until then).
 - CI on a seeded Supabase branch: branching is a paid feature; skipped.
+
+## Deployed
+- Repo: `https://github.com/Shoyo-Hin4ta/askMoov`, branch `main`. Vercel project `ask-moov` (Hobby, root directory `apps/web`, Next.js preset), production `https://ask-moov.vercel.app`, environment variables from `.env.vercel` (pooler hosts; the direct host is IPv6-only and fails on Vercel with `ENOTFOUND`). Vault `app_url` points at the deployment (`npm run db:vault`).
+- Verified 2026-10-24 03:08 UTC: database routes 200; a question asked through the deployment ran on Vercel and succeeded in 12 s with `git_sha 7abfeb3`; a finished run requeued by hand with a stale `queued_at` was POSTed by `ops.redispatch()` at the next minute, Vercel answered 202, the worker claimed attempt 2 and succeeded in 8 s. Local `APP_URL` stays `http://localhost:3100`; only Vault and Vercel carry the public URL.
+- A push to `main` deploys. Test files are excluded from the app's build-time type check (`apps/web/tsconfig.json`) and type-checked by `apps/web/tsconfig.test.json` in `npm run typecheck`.
 
 ## Gotchas that cost time (details in CLAUDE.md and the session logs)
 - Supabase CLI `migration new` blocks on stdin in scripts (`< /dev/null`); `db push` wants `yes |`.
