@@ -1,0 +1,12 @@
+{
+  "name": "@ask-moov/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@ask-moov/agent": "*",
+    "@ask-moov/db": "*",
+    "@ask-moov/shared": "*"
+  }
+}
