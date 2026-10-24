@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decide, lookupEntity, nameAgreement, type EntityMatch, type ResolvedEntity } from "./lookup-entity";
+import { chosenFor, decide, lookupEntity, nameAgreement, type EntityMatch, type ResolvedEntity } from "./lookup-entity";
 
 /** Design 4.5a: code decides ties; the thresholds are numbers. Similarities below are the ones measured on the seed (2026-10-24). */
 const student = (label: string, confidence: number, id = 1): EntityMatch => ({ type: "student", id, label, detail: "", confidence });
@@ -70,5 +70,26 @@ describe("lookupEntity", () => {
     const r = await lookupEntity(async () => rows([student("Ralph Wiggum", 0.97, 1209)]), [], "student", "Ralph");
     expect(r).toMatchObject({ status: "resolved", match: { id: 1209 } });
     expect(typeof (r as { match: EntityMatch }).match.id).toBe("number");
+  });
+});
+
+describe("chosenFor", () => {
+  const section: ResolvedEntity = { type: "section", id: 58, label: "Biology, period 4 (Edna Krabappel)", detail: "period 4, Edna Krabappel", text: "Biology, period 4 (Edna Krabappel)" };
+  const room: ResolvedEntity = { type: "room", id: 153, label: "214", detail: "classroom", text: "214" };
+  const bart: ResolvedEntity = { type: "student", id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+
+  it("a section chip answers a nameless section lookup in its run", () => {
+    expect(chosenFor([section], "section", "my class")).toBe(section);
+    expect(chosenFor([section], "section", "my 4th period")).toBe(section);
+  });
+  it("a number in the lookup text must appear in the chip: a period-4 chip does not answer for 6th period", () => {
+    expect(chosenFor([section], "section", "my 6th period")).toBeUndefined();
+    expect(chosenFor([room], "room", "Room 214")).toBe(room);
+    expect(chosenFor([room], "room", "Room 118")).toBeUndefined();
+  });
+  it("only the matching type, and never a person", () => {
+    expect(chosenFor([section], "room", "my class")).toBeUndefined();
+    expect(chosenFor([bart], "student", "Lisa")).toBeUndefined();
+    expect(chosenFor([bart], "student", "Bart")).toBeUndefined(); // people go through the name rule in lookupEntity
   });
 });

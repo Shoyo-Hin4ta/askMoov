@@ -140,3 +140,17 @@ export function pinEntity(set: PinSet, next: ResolvedEntity): PinSet {
   const collides = (p: ResolvedEntity) => p.type === next.type && (firstWord(p.label) === firstWord(next.label) || sameName(p.label, next.text));
   return { inherited: set.inherited.filter((p) => !collides(p)), added: [...set.added, next] };
 }
+
+/**
+ * A clarification chip answers the lookup it was clicked for. The chip's run re-asks the same question, so the planner
+ * repeats the lookup that was ambiguous, often with no name at all ("my class"); a pinned section cannot match by name
+ * the way a pinned student does, and the run looped back to the same chips (2026-10-24, run de9081cd). Rule: for a type
+ * that is not a person, the first lookup of that type in the chip's run takes the chosen entity, provided every number in
+ * the lookup text appears in the entity's label or detail ("my 6th period" does not take a period-4 chip; "Room 214" takes
+ * room "214"). People keep matching by name only, so "Bart and Lisa" never hands Lisa's lookup Bart's chip.
+ */
+export function chosenFor(chosen: ResolvedEntity[], type: EntityType, text: string): ResolvedEntity | undefined {
+  if (PEOPLE.has(type)) return undefined;
+  const numbers = text.match(/\d+/g) ?? [];
+  return chosen.find((p) => p.type === type && numbers.every((n) => `${p.label} ${p.detail}`.includes(n)));
+}

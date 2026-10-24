@@ -6,7 +6,7 @@ import { MODELS, type MessageParam } from "../llm";
 import { validatePlan } from "../plan-check";
 import { plannerSystem, plannerTools } from "../prompts";
 import type { State, StateUpdate, LookupRecord } from "../state";
-import { allPins, lookupEntity, pinEntity, type LookupFilters, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
+import { allPins, chosenFor, lookupEntity, pinEntity, type LookupFilters, type LookupResult, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
 import { everyDay, resolveDates, type ResolvedDates } from "../tools/resolve-dates";
 import { errorText, isFatal, pathOf, runBudget, threadMessages } from "./shared";
 
@@ -19,6 +19,8 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
   let pins: PinSet = { inherited: [...state.resolved.entities], added: [] };
   for (const p of deps.pins) pins = pinEntity(pins, p);
   const entities = (): ResolvedEntity[] => allPins(pins);
+  // The chips clicked for this run, each answering one lookup of its type (chosenFor); people still match by name.
+  const chosen: ResolvedEntity[] = [...deps.pins];
   const dates: (ResolvedDates & { text: string })[] = [...state.resolved.dates];
   const lookups: LookupRecord[] = [...state.lookups];
 
@@ -40,7 +42,15 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
         const i = input as LookupInput;
         const filters: LookupFilters = {};
         for (const k of ["grade", "period", "section_id", "teacher_id"] as const) if (i.filters?.[k] != null) filters[k] = i.filters[k]!;
-        const r = await lookupEntity(scoped, entities(), i.type, i.text, filters);
+        const chip = chosenFor(chosen, i.type, i.text);
+        let r: LookupResult;
+        if (chip) {
+          chosen.splice(chosen.indexOf(chip), 1);
+          const match = { type: chip.type, id: chip.id, label: chip.label, detail: chip.detail, confidence: 1 };
+          r = { status: "resolved", match, candidates: [match] };
+        } else {
+          r = await lookupEntity(scoped, entities(), i.type, i.text, filters);
+        }
         lookups.push({ type: i.type, text: i.text, status: r.status, candidates: r.candidates });
         if (r.status === "resolved") pins = pinEntity(pins, { type: r.match.type, id: r.match.id, label: r.match.label, detail: r.match.detail, text: i.text });
         result = r;

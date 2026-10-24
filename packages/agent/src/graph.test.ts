@@ -323,4 +323,21 @@ describe("graph topology", () => {
     expect(serialized.length).toBeLessThan(32 * 1024);
     expect(serialized).not.toContain('"student":1499');
   });
+
+  it("a section chip answers the nameless section lookup of its run instead of asking the same question again", async () => {
+    const section = { type: "section" as const, id: 58, label: "Biology, period 4 (Edna Krabappel)", detail: "period 4, Edna Krabappel", text: "Biology, period 4 (Edna Krabappel)" };
+    const lookupClass = { name: "lookup_entity", input: { type: "section", text: "my class", filters: { grade: null, period: null, section_id: null, teacher_id: null } } };
+    const sectionStep = { id: "a", kind: "spec", spec: { metric: "attendance_rate", entity: { type: "section", id: 58 }, time_range: { start: "2026-10-01", end: "2026-10-13" } } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupClass] }, planWith([sectionStep])], critique: [pass], present: [presentation] });
+    let entityQueries = 0;
+    const deps = fakeDeps(client, { pins: [section] });
+    const base = deps.scopedQuery.bind(deps);
+    deps.scopedQuery = async (p, sql, params) => { if (sql.includes("v_entities")) entityQueries += 1; return base(p, sql, params); };
+    const out = (await buildGraph(deps).invoke(input("run-16", "How many more classes does Bart need to hit 90% in my class?"))) as State;
+    expect(out.error).toBeNull();
+    expect(entityQueries).toBe(0);
+    expect(out.lookups[0]).toMatchObject({ type: "section", text: "my class", status: "resolved", candidates: [expect.objectContaining({ id: 58 })] });
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    expect(out.resolved.entities.map((e) => e.id)).toContain(58);
+  });
 });
