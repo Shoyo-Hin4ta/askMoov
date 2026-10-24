@@ -1,0 +1,32 @@
+{
+  "name": "ask-moov",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "test": "vitest run",
+    "typecheck": "for p in packages/shared packages/agent packages/db packages/evals; do tsc -p $p || exit 1; done && tsc -p apps/web",
+    "db:new": "supabase migration new",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset --linked",
+    "db:roles": "tsx --env-file=.env packages/db/src/setup-roles.ts",
+    "db:vault": "tsx --env-file=.env packages/db/src/set-vault.ts",
+    "seed": "tsx --env-file=.env packages/db/seed/generate.ts",
+    "evals": "tsx --env-file=.env packages/evals/src/run.ts",
+    "test:db": "node --env-file=.env ./node_modules/vitest/vitest.mjs run --config vitest.db.config.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "eslint": "^9.39.5",
+    "supabase": "^2.121.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
+  }
+}
