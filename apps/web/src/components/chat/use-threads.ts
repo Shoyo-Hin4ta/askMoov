@@ -18,5 +18,7 @@ export function useThreads(persona: PersonaKey): { threads: Thread[]; loading: b
       .finally(() => { if (alive) setSettledFor(persona); });
     return () => { alive = false; };
   }, [persona]);
-  return { threads, loading: settledFor !== persona, refresh };
+  const loading = settledFor !== persona;
+  // Never show the previous persona's rows under the new persona: an empty list plus `loading` renders "Loading threads".
+  return { threads: loading ? [] : threads, loading, refresh };
 }

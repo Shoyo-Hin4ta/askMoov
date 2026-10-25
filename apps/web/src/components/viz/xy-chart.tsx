@@ -18,6 +18,9 @@ type Props = {
 
 /** Short series get markers (8px with a surface ring); long ones stay a clean line and rely on hover. */
 const MARKER_MAX_POINTS = 12;
+/** Category labels longer than this are angled; longer than AXIS_LABEL_MAX they are cut on the axis (the tooltip keeps the full text). */
+const ANGLE_FROM_CHARS = 6;
+const AXIS_LABEL_MAX = 16;
 
 /**
  * One to many series as lines (time on x) or bars (categories on x). The renderer shapes the data and decides the
@@ -26,11 +29,28 @@ const MARKER_MAX_POINTS = 12;
 export function XYChart({ kind, title, data, x, y, series }: Props) {
   const grouped = series.length > 1;
   const order = new Map(series.map((s, i) => [s.label, i]));
-  const common = { data, responsive: true, className: "h-48 sm:h-60", style: { width: "100%" }, margin: { top: 12, right: 8, bottom: 4, left: 0 } };
+  // Bars are categories: every label shows (Recharts would otherwise drop crowded ticks), angled when the names are long.
+  // Lines are time: ticks thin to what fits and the tooltip carries the rest.
+  const categorical = kind === "bar";
+  const longest = categorical ? Math.max(0, ...data.map((r) => x.format(r[x.field]).length)) : 0;
+  const angled = longest > ANGLE_FROM_CHARS;
+  const axisLabel = (v: unknown) => { const s = x.format(v); return categorical && s.length > AXIS_LABEL_MAX ? `${s.slice(0, AXIS_LABEL_MAX - 1)}\u2026` : s; };
+  const common = { data, responsive: true, className: angled ? "h-60 sm:h-72" : "h-48 sm:h-60", style: { width: "100%" }, margin: { top: 12, right: 8, bottom: 4, left: angled ? 20 : 0 } };
   const axes = (
     <>
       <CartesianGrid vertical={false} stroke={CHART.grid} />
-      <XAxis dataKey={x.field} tick={CHART.tick} axisLine={{ stroke: CHART.axis }} tickLine={false} interval="preserveStartEnd" minTickGap={24} tickFormatter={(v: unknown) => x.format(v)} />
+      <XAxis
+        dataKey={x.field}
+        tick={CHART.tick}
+        axisLine={{ stroke: CHART.axis }}
+        tickLine={false}
+        interval={categorical ? 0 : "preserveStartEnd"}
+        minTickGap={categorical ? 0 : 24}
+        angle={angled ? -35 : 0}
+        textAnchor={angled ? "end" : "middle"}
+        height={angled ? 64 : 30}
+        tickFormatter={axisLabel}
+      />
       <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={y.percent ? 48 : 40} tickFormatter={(v: unknown) => y.format(v)} />
       <Tooltip
         {...CHART.tooltip}

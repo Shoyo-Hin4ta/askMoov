@@ -18,11 +18,13 @@ function idCell(labels: Labels, key: string, v: unknown): Cell {
 
 /**
  * Columns from result keys. A key the labels map covers, or one ending in "id", is an id column: left-aligned, printed as
- * its name when known with "Name (id)" in the title. Numeric columns (by the first non-null value) are right-aligned.
+ * its name when known with "Name (id)" in the title. A column whose cells show names is headed by the entity ("Student",
+ * "Origin room"), not "Student id". Numeric columns (by the first non-null value) are right-aligned.
  */
 export function inferColumns(keys: string[], rows: Row[], labels: Labels = {}): Column[] {
   return keys.map((key) => {
-    if (key in labels || ID_KEY.test(key)) return { key, label: humanize(key), align: "left", kind: "id", format: (v) => idCell(labels, key, v) };
+    if (key in labels) return { key, label: humanize(key.replace(/_id$/, "")), align: "left", kind: "id", format: (v) => idCell(labels, key, v) };
+    if (ID_KEY.test(key)) return { key, label: humanize(key), align: "left", kind: "id", format: (v) => idCell(labels, key, v) };
     const sample = rows.find((r) => r[key] !== null && r[key] !== undefined)?.[key];
     const numeric = sample !== undefined && isNumeric(sample);
     return { key, label: humanize(key), align: numeric ? "right" : "left", kind: numeric ? "number" : "text" };

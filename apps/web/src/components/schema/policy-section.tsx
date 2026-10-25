@@ -23,8 +23,8 @@ export function PolicySection({ policies }: { policies: PolicyRow[] }) {
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
                     <span className="font-mono text-xs text-ink">{p.policyname}</span>
                     <span className="rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] text-ink-2">{p.cmd}</span>
-                    <span className="text-ink">{appliesTo(p.qual)}</span>
                   </div>
+                  <p className="text-sm"><span className="text-xs text-ink-2">Applies to </span><span className="font-medium text-ink">{appliesTo(p.qual)}</span></p>
                   <pre className="wrap-anywhere whitespace-pre-wrap rounded-control bg-surface-2 p-2 font-mono text-[11px] leading-relaxed text-ink-2">{p.qual ?? "(no qual)"}</pre>
                 </li>
               ))}
