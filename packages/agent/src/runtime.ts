@@ -1,5 +1,5 @@
 import * as ops from "@ask-moov/db";
-import { getAppPool, getQueryPool, requireEnv, withScope } from "@ask-moov/db";
+import { getAppPool, getQueryPool, withScope } from "@ask-moov/db";
 import { HEARTBEAT_INTERVAL_MS, RUN_TIME_BUDGET_MS } from "@ask-moov/shared";
 import { createCheckpointer } from "./checkpointer";
 import type { AgentDeps } from "./deps";
@@ -117,7 +117,7 @@ export async function executeRun(run: ops.RunRow, o: RuntimeOptions): Promise<St
   });
   try {
     const [doc, now, usedTokens] = await Promise.all([schemaDoc(), frozenNow(), run.attempt > 1 ? ops.runTokensUsed(run.id) : Promise.resolve(0)]);
-    checkpointer ??= createCheckpointer(requireEnv("DATABASE_URL_APP"));
+    checkpointer ??= createCheckpointer(getAppPool());
     const deps = buildDeps(run, doc, now, o, usedTokens, pending);
     const graph = buildGraph(deps, checkpointer);
     const config = { configurable: { thread_id: run.thread_id } };

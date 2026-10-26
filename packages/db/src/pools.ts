@@ -1,4 +1,5 @@
 import pg from "pg";
+import { attachDatabasePool } from "@vercel/functions";
 import type { Persona } from "@ask-moov/shared";
 import { requireEnv } from "./env";
 
@@ -19,13 +20,28 @@ export type PoolClient = pg.PoolClient;
 let appPool: pg.Pool | undefined;
 let queryPool: pg.Pool | undefined;
 
+/**
+ * At most 4 clients, idle ones closed after 5 s, none older than 60 s. On Vercel a suspended instance's timers stop and its
+ * open sockets held the session pooler's slots (2026-10-25: 15 of 15 app-role slots idle for 17 minutes, every question
+ * failing with EMAXCONNSESSION). attachDatabasePool keeps the instance awake past the idle timeout after a release, but pg
+ * reports a plain pool.query's release under the request that opened the connection, so that is best effort; the 60 s
+ * lifetime bounds the rest. Deploy against the transaction pooler (port 6543), where an idle socket holds no database
+ * connection. Outside Vercel the hook does nothing. An idle client the pooler drops emits 'error'; unhandled, it kills the process.
+ */
+function runtimePool(connectionString: string): pg.Pool {
+  const pool = new Pool({ connectionString, max: 4, idleTimeoutMillis: 5_000, maxLifetimeSeconds: 60 });
+  pool.on("error", (e) => console.error(`pg pool: idle client error: ${e.message}`));
+  attachDatabasePool(pool);
+  return pool;
+}
+
 export function getAppPool(): pg.Pool {
-  appPool ??= new Pool({ connectionString: requireEnv("DATABASE_URL_APP"), max: 4 });
+  appPool ??= runtimePool(requireEnv("DATABASE_URL_APP"));
   return appPool;
 }
 
 export function getQueryPool(): pg.Pool {
-  queryPool ??= new Pool({ connectionString: requireEnv("DATABASE_URL_QUERY"), max: 4 });
+  queryPool ??= runtimePool(requireEnv("DATABASE_URL_QUERY"));
   return queryPool;
 }
 

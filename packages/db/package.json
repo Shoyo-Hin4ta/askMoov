@@ -3,10 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@ask-moov/shared": "*",
+    "@vercel/functions": "3.9.11",
     "pg": "^8.23.1"
   },
-  "devDependencies": { "@types/pg": "^8.23.1" }
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
 }
