@@ -37,7 +37,8 @@ export function Sidebar({ persona, onPersona, threads, threadsLoading, threadId,
         <PersonaSwitcher value={persona} onChange={onPersona} name={groupName} />
       </div>
       <ThreadList threads={threads} loading={threadsLoading} activeId={threadId} onOpen={onOpenThread} onNew={onNewThread} />
-      <nav className="flex border-t border-line text-xs text-ink-2" aria-label="Pages">
+      {/* Only below md, where the header has no page links; on desktop the header carries them. */}
+      <nav className="flex border-t border-line text-xs text-ink-2 md:hidden" aria-label="Pages">
         <Link href="/ops" className="flex flex-1 items-center gap-2 px-4 py-3 hover:text-ink">
           <Activity className="h-3.5 w-3.5" aria-hidden />
           Operations
