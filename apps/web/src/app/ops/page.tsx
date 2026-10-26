@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { inferColumns, type Column } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -13,7 +14,11 @@ export default async function OpsPage() {
   const tables = await opsTables();
   return (
     <main className="min-h-dvh bg-page text-ink">
-      <PageHeader title="Operations" links={[{ href: "/", label: "Back to chat" }, { href: "/schema", label: "Schema" }]} />
+      <PageHeader title="Operations" links={[{ href: "/", label: "Back to chat" }, { href: "/schema", label: "Schema" }, { href: "/ops/runs", label: "All runs", fromSm: true }, { href: "/ops/calls", label: "All model calls", fromSm: true }]} />
+      <nav className="flex gap-4 px-4 pt-4 text-xs text-ink-2 sm:hidden" aria-label="Indexes">
+        <Link href="/ops/runs" prefetch={false} className="hover:text-ink">All runs</Link>
+        <Link href="/ops/calls" prefetch={false} className="hover:text-ink">All model calls</Link>
+      </nav>
       {/* grid-cols-1 gives minmax(0, 1fr); the implicit auto column would let a wide table push the card past the viewport. */}
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-6 lg:grid-cols-2">
         {tables.map((t) => <OpsCard key={t.title} table={t} />)}

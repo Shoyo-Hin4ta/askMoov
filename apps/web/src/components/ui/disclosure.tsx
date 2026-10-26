@@ -3,9 +3,9 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "./cn";
 
 /** Native details/summary with a rotating chevron. Works without JavaScript. */
-export function Disclosure({ summary, children, className }: { summary: ReactNode; children: ReactNode; className?: string }) {
+export function Disclosure({ summary, children, className, id, defaultOpen }: { summary: ReactNode; children: ReactNode; className?: string; id?: string; defaultOpen?: boolean }) {
   return (
-    <details className={cn("group rounded-control border border-line", className)}>
+    <details id={id} open={defaultOpen} className={cn("group rounded-control border border-line", className)}>
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-1.5 px-3 py-2 text-xs font-medium text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
         <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
         <span className="min-w-0 wrap-anywhere">{summary}</span>

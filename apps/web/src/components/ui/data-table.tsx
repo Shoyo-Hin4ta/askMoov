@@ -5,7 +5,7 @@ import { cn } from "./cn";
 
 /** href: the cell links there (rendered with next/link, no prefetch). The caller decides which cells link. */
 export type Cell = { text: string; title?: string; href?: string };
-export type Column = { key: string; label: string; align: "left" | "right"; kind: "text" | "number" | "id"; format?: (v: unknown) => Cell };
+export type Column = { key: string; label: string; align: "left" | "right"; kind: "text" | "number" | "id"; format?: (v: unknown, row: Row) => Cell };
 export type Row = Record<string, unknown>;
 
 const ID_KEY = /(^|_)id$/;
@@ -31,8 +31,8 @@ export function inferColumns(keys: string[], rows: Row[], labels: Labels = {}): 
   });
 }
 
-function cell(c: Column, v: unknown): Cell {
-  if (c.format) return c.format(v);
+function cell(c: Column, v: unknown, row: Row): Cell {
+  if (c.format) return c.format(v, row);
   if (v === null || v === undefined) return { text: EMPTY_CELL };
   const text = formatValue(v);
   return { text, title: text.length > 24 ? text : undefined };
@@ -59,7 +59,7 @@ export function DataTable({ columns, rows, label, maxRows, className }: Props) {
           {shown.map((r, i) => (
             <tr key={i} className="border-b border-line-2 last:border-0 hover:bg-surface-2">
               {columns.map((c) => {
-                const { text, title, href } = cell(c, r[c.key]);
+                const { text, title, href } = cell(c, r[c.key], r);
                 return (
                   <td key={c.key} className={cn("px-3 py-1.5 text-ink", c.align === "right" ? "text-right tabular-nums" : "text-left")}>
                     {/* max-width is ignored on table cells; the block span is what truncates. */}

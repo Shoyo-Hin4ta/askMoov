@@ -21,7 +21,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /** One model round: what was sent, what came back, and the numbers. Collapsed by default; the tool calls it asked for sit under it. */
-export function RoundCard({ round, index, tools, systemBlocks }: { round: LlmRound; index: number; tools: AttachedTool[]; systemBlocks: SystemBlockView[] }) {
+export function RoundCard({ round, index, tools, systemBlocks, open }: { round: LlmRound; index: number; tools: AttachedTool[]; systemBlocks: SystemBlockView[]; open?: boolean }) {
   const req = round.request;
   const reqState = requestState(round);
   const resState = responseState(round);
@@ -65,7 +65,7 @@ export function RoundCard({ round, index, tools, systemBlocks }: { round: LlmRou
   );
 
   return (
-    <Disclosure summary={<span className={cn(round.error && "text-danger")}>{title}{round.error ? " · failed" : ""}</span>}>
+    <Disclosure id={`round-${round.id}`} defaultOpen={open} summary={<span className={cn(round.error && "text-danger")}>{title}{round.error ? " · failed" : ""}</span>}>
       <Tabs label={`Round ${index + 1}`} tabs={[
         { id: "request", label: "Request", content: request },
         { id: "response", label: "Response", content: response },

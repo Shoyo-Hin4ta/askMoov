@@ -16,8 +16,12 @@ import { formatTimestamp, trailView, type RunTrace } from "@/lib/trace";
 export const dynamic = "force-dynamic";
 
 /** One run top to bottom: header, the chat's trail, every model round and tool call, then the output. Server component over getRunTrace. */
-export default async function RunPage({ params }: { params: Promise<{ id: string }> }) {
+const CALL_ID = /^\d{1,18}$/;
+
+export default async function RunPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { id } = await params;
+  const roundParam = (await searchParams)["round"];
+  const openRound = typeof roundParam === "string" && CALL_ID.test(roundParam) ? roundParam : undefined;
   if (!isRunId(id)) notFound();
   const trace = (await getRunTrace(id)) as RunTrace | null;
   if (!trace) notFound();
@@ -29,7 +33,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
 
   return (
     <main className="min-h-dvh bg-page text-ink">
-      <PageHeader title="Run" links={[{ href: "/", label: "Back to chat" }, { href: "/ops", label: "Operations" }, { href: "/schema", label: "Schema" }]} />
+      <PageHeader title="Run" links={[{ href: "/", label: "Back to chat" }, { href: "/ops", label: "Operations" }, { href: "/ops/runs", label: "All runs" }, { href: "/schema", label: "Schema", fromSm: true }]} />
       <div className="mx-auto min-w-0 max-w-6xl space-y-4 px-4 py-4 sm:px-6 sm:py-6">
         <AutoRefresh active={inFlight} />
         <RunHeader run={trace.run} />
@@ -41,7 +45,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
         <Disclosure summary={`Step summaries, ${steps.length} step${steps.length === 1 ? "" : "s"}`}>
           <DataTable columns={inferColumns(["node", "attempt", "started", "duration", "error", "input_summary", "output_summary"], steps)} rows={steps} label="Step summaries" className="text-xs" />
         </Disclosure>
-        <Rounds calls={trace.llm_calls} tools={trace.tool_calls} />
+        <Rounds calls={trace.llm_calls} tools={trace.tool_calls} openRound={openRound} />
         <OutputSection output={trace.output} results={trace.results} />
       </div>
     </main>
