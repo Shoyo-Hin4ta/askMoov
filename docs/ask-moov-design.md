@@ -571,7 +571,7 @@ Entity pinning lives here. When a clarification chip is clicked, or a lookup ret
 
 Episodic memory is the system remembering which plans worked. No vectors, no embeddings, no names.
 
-Written once per run after `present`: `question_templated` (every resolved entity replaced by `{student}`, `{section}`, `{teacher}`, `{room}`, `{school}`, `{wing}`, every date phrase by `{date_range}`, one pass with the longest form first, only people also matched by first name), the final plan, the metrics used, the shape of the step the chart was drawn from, the critique, `schema_version`, `git_sha`, `score = 1`. A run that exhausted replans is written with `score = -1`.
+Written once per run after `present`: `question_templated` (every resolved entity replaced by `{student}`, `{section}`, `{teacher}`, `{room}`, `{school}`, `{wing}`, every date phrase by `{date_range}`, one pass with the longest form first, only people also matched by first name), the final plan, the metrics used, the shape of the step the chart was drawn from, the critic's verdict (pass or fail, never its reason), `schema_version`, `git_sha`, `score = 1`. Free text the models wrote about the run's data keeps no people: a tier-3 step's `sql` and `reason` get the same substitution for every student and teacher the run named, including one a later lookup unpinned (`forMemory`, 2026-10-26). A run that exhausted replans is written with `score = -1`.
 
 Feedback: thumbs up adds 1, thumbs down subtracts 2, in the same transaction as the feedback row. Retrieval filters `score >= 0`; two thumbs down take an episode out of retrieval (tested).
 
