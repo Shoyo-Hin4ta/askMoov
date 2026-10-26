@@ -17,8 +17,8 @@ type Clock = { raw: string; minutes: number[] };
 const EPSILON = 1e-9;
 /** A whole number or a decimal. Thousands groups must be exactly three digits and not run into more ("1203,1204" is two ids). A trailing % or the word percent marks a percentage. */
 const NUMBER = /(\d{1,3}(?:,\d{3})+(?!\d)|\d+)(?:\.(\d+))?(\s*%|\s*percent(?:age\s+points?)?\b)?/gi;
-/** "9:00", "09:00", "2:10 pm", "12:05 a.m."; not the seconds of a longer clock and not part of a longer digit run. */
-const TIME = /(?<![\d:.])(\d{1,2}):(\d{2})(?![\d:])(?:\s*([ap])\.?m\b\.?)?/gi;
+/** "9:00", "09:00", "09:56:11", "2:10 pm", "12:05 a.m."; seconds are allowed and ignored (a timestamp quoted from a row), the token is never part of a longer digit run. */
+const TIME = /(?<![\d:.])(\d{1,2}):(\d{2})(?::(\d{2}))?(?![\d:])(?:\s*([ap])\.?m\b\.?)?/gi;
 /** The clock part of an ISO datetime as JSON writes one; the date part stays for the number pass. */
 const ISO_CLOCK = /(?<=\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?Z?/g;
 /** "1. First\n2. Second": the markers of a markdown list are not numbers. */
@@ -35,7 +35,7 @@ export function extractNumbers(text: string): { numbers: Found[]; times: Clock[]
     if (minutes) times.push({ raw: `${h}:${mm}`, minutes });
     return " ";
   });
-  t = t.replace(TIME, (m, h: string, mm: string, ap: string | undefined) => {
+  t = t.replace(TIME, (m, h: string, mm: string, _ss: string | undefined, ap: string | undefined) => {
     const minutes = clock(Number(h), Number(mm), ap ? ap.toLowerCase() : null);
     if (!minutes) return m;
     times.push({ raw: m.trim(), minutes });

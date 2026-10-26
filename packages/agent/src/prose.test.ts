@@ -36,6 +36,9 @@ describe("extractNumbers", () => {
     expect(times("the 9:00 hour")).toEqual([["9:00", [540, 1260]]]);
     expect(times("at 2:10 pm and 12:05 a.m. and 12:10 PM and 14:10")).toEqual([["2:10 pm", [850]], ["12:05 a.m.", [5]], ["12:10 PM", [730]], ["14:10", [850]]]);
     expect(nums("the 9:00 hour")).toEqual([]);
+    // a timestamp quoted from a row keeps its seconds (live run 38b396ba, 2026-10-26: 56, 36 and 24 were read as numbers)
+    expect(times("ran from 09:56:11 to 10:36:24 (UTC)")).toEqual([["09:56:11", [596, 1316]], ["10:36:24", [636, 1356]]]);
+    expect(nums("ran from 09:56:11 to 10:36:24 (UTC)")).toEqual([]);
   });
 
   it("an ISO datetime yields its date parts as numbers and its clock as a time", () => {
@@ -79,6 +82,7 @@ describe("proseMismatch: rounding at the written precision, sign ignored, rates 
     ok(["2:10 pm, that is 14:10"], ["\"arrived_at\":\"2026-10-12T14:10:00.000Z\""]);
     ok(["12:10 pm and 12:05 am"], ["T12:10 \"2026-10-12T00:05:00.000Z\" \"2026-10-12T12:10:00.000Z\""]);
     ok(["7:50 and 9:00"], ["\"minute_bucket\":\"07:50\"", "\"hour\":\"2026-10-06T09:00:00.000Z\""]);
+    ok(["hall passes ran from 09:56:11 to 10:36:24 (UTC)"], ["sample_rows: [{\"last_period3_pass_end\":\"2026-10-06T10:36:24.000Z\",\"first_period3_pass_start\":\"2026-10-06T09:56:11.000Z\"}]"]);
     bad(["online from 8:00 to 15:00"], ["{\"hour_bucket\":8},{\"hour_bucket\":14}"], "15:00");
     bad(["at 10:10 am"], ["\"2026-10-12T14:10:00.000Z\""], "10:10 am");
   });
