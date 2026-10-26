@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chosenFor, decide, lookupEntity, nameAgreement, type EntityMatch, type ResolvedEntity } from "./lookup-entity";
+import { chosenFor, decide, lookupEntity, lookupKey, nameAgreement, type EntityMatch, type ResolvedEntity } from "./lookup-entity";
 
 /** Design 4.5a: code decides ties; the thresholds are numbers. Similarities below are the ones measured on the seed (2026-10-24). */
 const student = (label: string, confidence: number, id = 1): EntityMatch => ({ type: "student", id, label, detail: "", confidence });
@@ -87,9 +87,34 @@ describe("chosenFor", () => {
     expect(chosenFor([room], "room", "Room 214")).toBe(room);
     expect(chosenFor([room], "room", "Room 118")).toBeUndefined();
   });
-  it("only the matching type, and never a person", () => {
+  it("only the matching type", () => {
     expect(chosenFor([section], "room", "my class")).toBeUndefined();
+    expect(chosenFor([bart], "teacher", "Bart")).toBeUndefined();
+  });
+  it("a person chip answers a lookup whose words are all in its name: a surname tie does not come back after the click", () => {
+    expect(chosenFor([bart], "student", "Simpson")).toBe(bart);
+    expect(chosenFor([bart], "student", "Bart")).toBe(bart);
+    expect(chosenFor([bart], "student", "bart  simpson")).toBe(bart);
+    const edna: ResolvedEntity = { type: "teacher", id: 12, label: "Edna Krabappel", detail: "", text: "Edna Krabappel" };
+    expect(chosenFor([edna], "teacher", "Ms. Krabappel")).toBe(edna);
+  });
+  it("a person chip never answers for someone else", () => {
     expect(chosenFor([bart], "student", "Lisa")).toBeUndefined();
-    expect(chosenFor([bart], "student", "Bart")).toBeUndefined(); // people go through the name rule in lookupEntity
+    expect(chosenFor([bart], "student", "Bart Reyes")).toBeUndefined();
+    expect(chosenFor([bart], "student", "Lisa Simpson")).toBeUndefined();
+    expect(chosenFor([bart], "student", "Ms.")).toBeUndefined();
+  });
+});
+
+describe("lookupKey", () => {
+  it("the same lookup is the same key whatever the case, spacing or filter order", () => {
+    expect(lookupKey("section", "My  Class ", {})).toBe(lookupKey("section", "my class", {}));
+    expect(lookupKey("student", "Bart", { grade: 9, period: 4 })).toBe(lookupKey("student", "bart", { period: 4, grade: 9 }));
+  });
+  it("a different type, different words or different filters are different lookups", () => {
+    expect(lookupKey("room", "my class", {})).not.toBe(lookupKey("section", "my class", {}));
+    expect(lookupKey("section", "my 4th period", {})).not.toBe(lookupKey("section", "my 6th period", {}));
+    expect(lookupKey("student", "Bart", { grade: 9 })).not.toBe(lookupKey("student", "Bart", { grade: 11 }));
+    expect(lookupKey("student", "Bart", { grade: 9 })).not.toBe(lookupKey("student", "Bart", {}));
   });
 });

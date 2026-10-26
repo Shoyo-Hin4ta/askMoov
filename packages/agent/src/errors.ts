@@ -1,3 +1,5 @@
+import type { MessageParam } from "./llm";
+
 /**
  * Every failure in the agent is one of these. The worker maps them to a run status:
  * RetryableError -> back to queued (attempt + 1); everything else -> failed, with the class name in runs.error.
@@ -37,7 +39,15 @@ export class LlmTruncatedError extends AgentError {
   }
 }
 
-export class LlmParseError extends AgentError {}
+/**
+ * The final reply did not parse. `transcript` is what the failing round was sent (tool rounds included) and `reply` its text,
+ * so a corrective call can continue that conversation instead of restarting it and redoing every lookup (2026-10-25, run 9a207dea).
+ */
+export class LlmParseError extends AgentError {
+  constructor(message: string, readonly transcript: readonly MessageParam[] = [], readonly reply = "") {
+    super(message);
+  }
+}
 
 export class BudgetExceededError extends AgentError {
   constructor(readonly used: number, readonly cap: number) {

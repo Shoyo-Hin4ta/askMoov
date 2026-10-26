@@ -7,6 +7,8 @@
     "expect": { "kind": "plan", "viz_type": "calendar" } },
   { "id": "teacher-lisa-permission", "persona": "teacher", "question": "How many more classes does Lisa need to hit 90%?",
     "expect": { "kind": "out_of_scope", "reason": "permission" } },
+  { "id": "teacher-bart-p4-classes-to-90", "persona": "teacher", "question": "How many more classes does Bart need to attend to hit 90% in my 4th period this month?",
+    "expect": { "kind": "plan", "steps_min": 2, "result": { "formula": "classes_to_target", "value_is": 32 } } },
   { "id": "teacher-nelson-permission", "persona": "teacher", "question": "How many bathroom passes did Nelson Muntz take this month?",
     "expect": { "kind": "out_of_scope", "reason": "permission" } },
   { "id": "teacher-oos-not-in-data", "persona": "teacher", "question": "What are Bart's grades?",

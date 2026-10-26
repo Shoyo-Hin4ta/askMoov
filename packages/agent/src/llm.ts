@@ -160,12 +160,12 @@ export class Llm {
         try {
           parsed = JSON.parse(extractJson(text));
         } catch (e) {
-          failure = new LlmParseError(`not JSON: ${(e as Error).message}`);
+          failure = new LlmParseError(`not JSON: ${(e as Error).message}`, messages.slice(), text);
         }
         if (!failure) {
           const result = call.schema.safeParse(parsed);
           if (result.success) output = result.data;
-          else failure = new LlmParseError(result.error.issues.slice(0, 6).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
+          else failure = new LlmParseError(result.error.issues.slice(0, 6).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "), messages.slice(), text);
         }
       }
 

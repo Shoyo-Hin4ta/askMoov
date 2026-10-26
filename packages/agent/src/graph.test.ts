@@ -340,4 +340,54 @@ describe("graph topology", () => {
     expect(out.plan_output).toMatchObject({ kind: "plan" });
     expect(out.resolved.entities.map((e) => e.id)).toContain(58);
   });
+
+  it("after a parse-error correction the planner keeps its tool rounds, and a repeated lookup keeps the chip's answer (run 9a207dea)", async () => {
+    const section = { type: "section" as const, id: 58, label: "Biology, period 4 (Edna Krabappel)", detail: "period 4, Edna Krabappel", text: "Biology, period 4 (Edna Krabappel)" };
+    const lookupClass = { name: "lookup_entity", input: { type: "section", text: "my class", filters: { grade: null, period: null, section_id: null, teacher_id: null } } };
+    const sectionStep = { id: "a", kind: "spec", spec: { metric: "attendance_rate", entity: { type: "section", id: 58 }, time_range: { start: "2026-10-01", end: "2026-10-13" } } };
+    // what run 9a207dea's planner wrote: a lookup filter used as a spec filter, which the strict Filters schema rejects
+    const rejected = planWith([{ ...sectionStep, spec: { ...sectionStep.spec, filters: { section_id: 58 } } }]);
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupClass] }, rejected, { toolUse: [lookupClass] }, planWith([sectionStep])], critique: [pass], present: [presentation] });
+    const planRequests: { role: string }[][] = [];
+    const create = client.messages.create.bind(client.messages);
+    client.messages.create = async (params, options) => {
+      const sys = typeof params.system === "string" ? params.system : (params.system ?? []).map((b) => b.text).join("\n");
+      if (sys.startsWith("You are the planner")) planRequests.push(params.messages.map((m) => ({ role: m.role })));
+      return create(params, options);
+    };
+    // the search alone ties every section for "my class", as it did live
+    const sections = [56, 57, 58, 59, 60].map((id, i) => ({ id, label: `Biology, period ${[1, 2, 4, 6, 7][i]} (Edna Krabappel)`, detail: "", confidence: 0 }));
+    let entityQueries = 0;
+    const deps = fakeDeps(client, { pins: [section] });
+    const base = deps.scopedQuery.bind(deps);
+    deps.scopedQuery = async (p, sql, params) => {
+      if (sql.includes("v_entities")) { entityQueries += 1; return { rows: sections, columns: [] }; }
+      return base(p, sql, params);
+    };
+    const out = (await buildGraph(deps).invoke(input("run-17", "How many more classes does Bart need to hit 90% in my class?"))) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    expect(entityQueries).toBe(0);
+    expect(out.lookups.map((l) => [l.text, l.status, l.candidates[0]?.id])).toEqual([["my class", "resolved", 58], ["my class", "resolved", 58]]);
+    // the corrective round continues the failed conversation: question, tool_use, tool_result, the rejected reply, the correction
+    expect(planRequests[2]!.map((m) => m.role)).toEqual(["user", "assistant", "user", "assistant", "user"]);
+  });
+
+  it("a person chip answers the surname lookup of its run instead of tying the two Simpsons again", async () => {
+    const bart = { type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+    const lookupSimpson = { name: "lookup_entity", input: { type: "student", text: "Simpson", filters: { grade: null, period: null, section_id: null, teacher_id: null } } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupSimpson] }, planWith([specStep])], critique: [pass], present: [presentation] });
+    let entityQueries = 0;
+    const deps = fakeDeps(client, { pins: [bart] });
+    const base = deps.scopedQuery.bind(deps);
+    deps.scopedQuery = async (p, sql, params) => {
+      if (sql.includes("v_entities")) { entityQueries += 1; return { rows: [{ id: 1203, label: "Bart Simpson", detail: "grade 9", confidence: 0.9 }, { id: 1205, label: "Lisa Simpson", detail: "grade 7", confidence: 0.9 }], columns: [] }; }
+      return base(p, sql, params);
+    };
+    const out = (await buildGraph(deps).invoke(input("run-18", "How many passes did Simpson take this month?"))) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    expect(entityQueries).toBe(0);
+    expect(out.lookups).toEqual([expect.objectContaining({ text: "Simpson", status: "resolved", candidates: [expect.objectContaining({ id: 1203 })] })]);
+  });
 });

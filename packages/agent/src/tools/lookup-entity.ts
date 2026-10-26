@@ -147,10 +147,25 @@ export function pinEntity(set: PinSet, next: ResolvedEntity): PinSet {
  * the way a pinned student does, and the run looped back to the same chips (2026-10-24, run de9081cd). Rule: for a type
  * that is not a person, the first lookup of that type in the chip's run takes the chosen entity, provided every number in
  * the lookup text appears in the entity's label or detail ("my 6th period" does not take a period-4 chip; "Room 214" takes
- * room "214"). People keep matching by name only, so "Bart and Lisa" never hands Lisa's lookup Bart's chip.
+ * room "214"). A person chip takes a lookup whose words, honorific aside, are all words of the chip's name: "Simpson" and
+ * "Ms. Simpson" take Bart Simpson, so a surname tie does not come back after the click; "Lisa" and "Bart Reyes" do not.
  */
 export function chosenFor(chosen: ResolvedEntity[], type: EntityType, text: string): ResolvedEntity | undefined {
-  if (PEOPLE.has(type)) return undefined;
+  if (PEOPLE.has(type)) {
+    const words = norm(text.trim().replace(HONORIFIC, "")).split(/\s+/).filter(Boolean);
+    if (words.length === 0) return undefined;
+    return chosen.find((p) => p.type === type && words.every((w) => norm(p.label).split(/\s+/).includes(w)));
+  }
   const numbers = text.match(/\d+/g) ?? [];
   return chosen.find((p) => p.type === type && numbers.every((n) => `${p.label} ${p.detail}`.includes(n)));
+}
+
+/**
+ * One lookup's identity within a run: its type, its words (case and spacing aside) and its filters. A lookup the run already
+ * resolved answers the same lookup again (planNode): a corrective call can make the planner repeat it after the chip that
+ * answered it is spent, and the search alone ties every section for "my class" (2026-10-25, run 9a207dea).
+ */
+export function lookupKey(type: EntityType, text: string, filters: LookupFilters): string {
+  const set = Object.entries(filters).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b));
+  return `${type}|${norm(text).replace(/\s+/g, " ")}|${JSON.stringify(set)}`;
 }

@@ -6,7 +6,7 @@ import { MODELS, type MessageParam } from "../llm";
 import { validatePlan } from "../plan-check";
 import { plannerSystem, plannerTools } from "../prompts";
 import type { State, StateUpdate, LookupRecord } from "../state";
-import { allPins, chosenFor, lookupEntity, pinEntity, type LookupFilters, type LookupResult, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
+import { allPins, chosenFor, lookupEntity, lookupKey, pinEntity, type LookupFilters, type LookupResult, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
 import { everyDay, resolveDates, type ResolvedDates } from "../tools/resolve-dates";
 import { errorText, isFatal, pathOf, runBudget, threadMessages } from "./shared";
 
@@ -21,6 +21,8 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
   const entities = (): ResolvedEntity[] => allPins(pins);
   // The chips clicked for this run, each answering one lookup of its type (chosenFor); people still match by name.
   const chosen: ResolvedEntity[] = [...deps.pins];
+  // Lookups this call has resolved, by lookupKey: the same lookup asked again gets the same entity, never a fresh search.
+  const answered = new Map<string, LookupResult>();
   const dates: (ResolvedDates & { text: string })[] = [...state.resolved.dates];
   const lookups: LookupRecord[] = [...state.lookups];
 
@@ -42,14 +44,18 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
         const i = input as LookupInput;
         const filters: LookupFilters = {};
         for (const k of ["grade", "period", "section_id", "teacher_id"] as const) if (i.filters?.[k] != null) filters[k] = i.filters[k]!;
-        const chip = chosenFor(chosen, i.type, i.text);
-        let r: LookupResult;
-        if (chip) {
-          chosen.splice(chosen.indexOf(chip), 1);
-          const match = { type: chip.type, id: chip.id, label: chip.label, detail: chip.detail, confidence: 1 };
-          r = { status: "resolved", match, candidates: [match] };
-        } else {
-          r = await lookupEntity(scoped, entities(), i.type, i.text, filters);
+        const key = lookupKey(i.type, i.text, filters);
+        let r = answered.get(key);
+        if (!r) {
+          const chip = chosenFor(chosen, i.type, i.text);
+          if (chip) {
+            chosen.splice(chosen.indexOf(chip), 1);
+            const match = { type: chip.type, id: chip.id, label: chip.label, detail: chip.detail, confidence: 1 };
+            r = { status: "resolved", match, candidates: [match] };
+          } else {
+            r = await lookupEntity(scoped, entities(), i.type, i.text, filters);
+          }
+          if (r.status === "resolved") answered.set(key, r);
         }
         lookups.push({ type: i.type, text: i.text, status: r.status, candidates: r.candidates });
         if (r.status === "resolved") pins = pinEntity(pins, { type: r.match.type, id: r.match.id, label: r.match.label, detail: r.match.detail, text: i.text });
@@ -88,10 +94,13 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
           node: "plan", model: MODELS.main, schema: PlannerOutput, formatSchema: null, system, messages, tools: plannerTools(), onToolUse, effort: "medium", max_tokens: 16_000, budget: runBudget(state),
         }));
       } catch (e) {
-        // schema-invalid JSON gets the same single correction as a schema-valid but wrong plan
+        // Schema-invalid JSON gets the same single correction as a schema-valid but wrong plan, and like it continues the
+        // conversation that failed: restarting from the thread made the planner redo its lookups (2026-10-25, run 9a207dea).
         if (e instanceof LlmParseError && corrective < MAX_CORRECTIVE_CALLS) {
           corrective += 1;
-          messages = [...base, { role: "user", content: `Your previous reply did not match the required shape: ${e.message}. Reply with the JSON object only, using exactly the field names and allowed values from the rules.` }];
+          const sent = e.transcript.length > 0 ? [...e.transcript] : base;
+          const reply: MessageParam[] = e.reply ? [{ role: "assistant", content: e.reply }] : [];
+          messages = [...sent, ...reply, { role: "user", content: `Your previous reply did not match the required shape: ${e.message}. Reply with the JSON object only, using exactly the field names and allowed values from the rules.` }];
           continue;
         }
         throw e;

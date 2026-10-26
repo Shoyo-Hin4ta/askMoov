@@ -157,4 +157,18 @@ describe("llm wrapper: the transcript", () => {
     expect(records[1]!.request!.messages).toHaveLength(3); // user, assistant tool_use, user tool_result
     expect(records[0]!.stop_reason).toBe("tool_use");
   });
+
+  it("a parse error after a tool round carries what the failing round was sent and the rejected text", async () => {
+    const replies = [
+      message({ content: [{ type: "tool_use", id: "tu_1", name: "lookup_entity", input: { type: "student", text: "Bart" } }], stop_reason: "tool_use" } as never),
+      message({ text: '{"answer":"four"}' }),
+    ];
+    const client: LlmClient = { messages: { create: vi.fn(async () => replies.shift()!) } };
+    const llm = new Llm(client, { runTokenCap: 1_000_000 });
+    const err = await llm.callStructured({ node: "plan", model: "claude-opus-5-5", schema: Schema, system: "s", messages: [{ role: "user", content: "q" }], tools: [{ name: "lookup_entity", input_schema: { type: "object" } }], onToolUse: async () => ({ id: 1203 }) }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LlmParseError);
+    const parse = err as LlmParseError;
+    expect(parse.transcript.map((m) => m.role)).toEqual(["user", "assistant", "user"]); // question, tool_use, tool_result
+    expect(parse.reply).toBe('{"answer":"four"}');
+  });
 });
