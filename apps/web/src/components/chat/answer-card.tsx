@@ -23,7 +23,7 @@ export function AnswerCard({ view, onChip }: { view: RunView & { output: NonNull
       <div className="space-y-4">
         <Markdown text={out.answer_md} />
         {plan?.kind === "out_of_scope" && plan.options && plan.options.length > 0 && <ClarificationChips options={plan.options} onPick={(o) => onChip(o, view.question)} />}
-        {out.viz && <VizRenderer viz={out.viz} step={answerStep} results={out.results} labels={out.labels ?? {}} plan={plan} />}
+        {out.viz && <VizRenderer viz={out.viz} step={answerStep} steps={out.steps} results={out.results} labels={out.labels ?? {}} plan={plan} />}
         {out.caveats.length > 0 && <Caveats caveats={out.caveats} />}
         {out.steps.length > 0 && <SqlSteps steps={out.steps} />}
         <div className="flex flex-wrap items-center justify-between gap-2">

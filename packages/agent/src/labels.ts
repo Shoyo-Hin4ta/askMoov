@@ -1,4 +1,4 @@
-import type { EntityType } from "@ask-moov/shared";
+import type { EntityType, Plan } from "@ask-moov/shared";
 import type { Row } from "./deps";
 
 /**
@@ -27,6 +27,31 @@ export async function entityLabels(query: LabelQuery, columns: string[], rows: R
     for (const r of rows) { const v = r[c]; if (v !== null && v !== undefined && v !== "") ids.add(String(v)); }
     idsByType.set(type, ids);
   }
+  const found = await labelsByType(query, idsByType);
+  const out: Labels = {};
+  for (const c of idColumns) { const map = found.get(ID_COLUMNS[c]!); if (map) out[c] = map; }
+  return out;
+}
+
+/**
+ * Names for the entities a plan's spec steps ask about (the two schools of a comparison, the student of a target), keyed by
+ * entity type ({ school: { "1": "Springfield High" } }), so the UI can label a calculation's inputs. Step references
+ * ("$a.rows[*].student") are not ids and are skipped.
+ */
+export async function planEntityLabels(query: LabelQuery, plan: Plan): Promise<Labels> {
+  const idsByType = new Map<EntityType, Set<string>>();
+  for (const s of plan.steps) {
+    if (s.kind !== "spec" || !s.spec.entity) continue;
+    const { type, id } = s.spec.entity;
+    const ids = idsByType.get(type) ?? new Set<string>();
+    for (const v of Array.isArray(id) ? id : [id]) if (!String(v).startsWith("$")) ids.add(String(v));
+    idsByType.set(type, ids);
+  }
+  return Object.fromEntries(await labelsByType(query, idsByType));
+}
+
+/** One scoped lookup per entity type: row-level security on v_entities means only entities the persona may see get a name. */
+async function labelsByType(query: LabelQuery, idsByType: Map<EntityType, Set<string>>): Promise<Map<EntityType, Record<string, string>>> {
   const found = new Map<EntityType, Record<string, string>>();
   for (const [type, ids] of idsByType) {
     if (ids.size === 0) continue;
@@ -35,9 +60,7 @@ export async function entityLabels(query: LabelQuery, columns: string[], rows: R
     for (const r of res) if (r["id"] !== undefined && r["label"] !== undefined) map[String(r["id"])] = String(r["label"]);
     if (Object.keys(map).length > 0) found.set(type, map);
   }
-  const out: Labels = {};
-  for (const c of idColumns) { const map = found.get(ID_COLUMNS[c]!); if (map) out[c] = map; }
-  return out;
+  return found;
 }
 
 /** Rows for the model: an id becomes "Name (id)", so prose can use the name and the id stays traceable. Unknown ids are left alone. */

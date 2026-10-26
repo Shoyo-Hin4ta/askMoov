@@ -7,7 +7,7 @@ import { entitiesOfRun, forMemory, retrieveEpisodes, templatize, writeEpisode } 
 import { RetryableError } from "./errors";
 import { buildGraph } from "./graph";
 import { startHeartbeat } from "./heartbeat";
-import { entityLabels, mergeLabels, type Labels } from "./labels";
+import { entityLabels, mergeLabels, planEntityLabels, type Labels } from "./labels";
 import { createAnthropicClient, Llm, type LlmClient } from "./llm";
 import { currentSchemaVersion, loadSchemaDoc, type SchemaDoc } from "./schema-doc";
 import { newRunInput, type State } from "./state";
@@ -182,6 +182,8 @@ async function complete(run: ops.RunRow, final: State, schemaVersion: string, o:
       const { rows } = await deps.results.get(run.id, s.id);
       mergeLabels(labels, await entityLabels(scoped, r.columns, rows));
     }
+    // and for the entities the steps ask about, so a calculation's inputs can be named (the two schools of a comparison)
+    mergeLabels(labels, await planEntityLabels(scoped, plan));
   }
   await ops.insertRunEntities(run.id, final.resolved.entities);
   await ops.saveOutput(run.id, { answer_md: final.answer ?? "", viz: final.viz, caveats: final.caveats, steps, plan, labels });

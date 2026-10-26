@@ -2,6 +2,7 @@
 import type { Labels, PlanOut, Results, StepOut, VizOut } from "@/lib/client/api";
 import { formatDay, formatPercent, formatValue, humanize, isIsoDate } from "@/lib/format";
 import { displayId } from "@/lib/labels";
+import { calcInputs } from "@/lib/calc-inputs";
 import { isRateStep } from "@/lib/rates";
 import { CalendarHeatmap } from "./calendar-heatmap";
 import { CHART } from "./chart-theme";
@@ -11,7 +12,7 @@ import { StatTile } from "./stat-tile";
 import { XYChart, type AxisFormat } from "./xy-chart";
 
 type Row = Record<string, unknown>;
-type Props = { viz: VizOut; step: StepOut | undefined; results: Results; labels: Labels; plan: PlanOut };
+type Props = { viz: VizOut; step: StepOut | undefined; steps: StepOut[]; results: Results; labels: Labels; plan: PlanOut };
 
 function pickField(preferred: string | undefined, cols: string[], fallback: (c: string) => boolean): string | undefined {
   if (preferred && cols.includes(preferred)) return preferred;
@@ -35,7 +36,7 @@ function dimensionFormat(labels: Labels, field: string): AxisFormat {
  * labels for id columns, percentages for rate steps, the pivot for grouped results. Falls back to a table whenever the
  * rows do not fit the chart.
  */
-export function VizRenderer({ viz, step, results, labels, plan }: Props) {
+export function VizRenderer({ viz, step, steps, results, labels, plan }: Props) {
   if (!viz || !step) return null;
   const result = results[step.id];
   const rows = result?.rows ?? [];
@@ -45,7 +46,7 @@ export function VizRenderer({ viz, step, results, labels, plan }: Props) {
   const table = <ResultTable title={viz.title} columns={cols} rows={rows} labels={labels} />;
 
   if (viz.type === "stat") {
-    return <StatTile label={viz.title} value={step.value ?? rows[0]?.["value"]} note={step.value === null ? step.explanation : undefined} format={percent ? formatPercent : undefined} />;
+    return <StatTile label={viz.title} value={step.value ?? rows[0]?.["value"]} note={step.value === null ? step.explanation : undefined} format={percent ? formatPercent : undefined} inputs={calcInputs(plan, steps, labels, step.id)} />;
   }
   if (rows.length === 0) return table;
 

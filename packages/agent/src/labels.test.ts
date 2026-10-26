@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { entityLabels, mergeLabels, withLabels, type LabelQuery } from "./labels";
+import { entityLabels, mergeLabels, planEntityLabels, withLabels, type LabelQuery } from "./labels";
+import type { Plan } from "@ask-moov/shared";
 
 /** The query is the scoped entity view: it answers only for ids the persona may see. */
 const directory: Record<string, Record<string, string>> = {
   student: { "1082": "Ana Lopez", "1203": "Bart Simpson" },
   room: { "153": "214", "185": "Gym" },
+  school: { "1": "Springfield High", "2": "Shelbyville High" },
 };
 const query: LabelQuery = async (_sql, params) => {
   const [type, ids] = params as [string, string[]];
@@ -51,5 +53,20 @@ describe("mergeLabels", () => {
   it("unions maps per column across steps", () => {
     const out = mergeLabels({ student: { "1": "A" } }, { student: { "2": "B" }, room: { "9": "Gym" } });
     expect(out).toEqual({ student: { "1": "A", "2": "B" }, room: { "9": "Gym" } });
+  });
+});
+
+describe("planEntityLabels", () => {
+  const spec = (id: string, type: string, entityId: unknown) => ({ id, kind: "spec", spec: { metric: "attendance_rate", entity: { type, id: entityId }, time_range: { start: "2026-10-01", end: "2026-10-13" } } });
+  it("names the entities the plan's steps ask about, keyed by entity type", async () => {
+    const plan = { kind: "plan", answer_from: ["c"], expected_shape: "scalar", steps: [
+      spec("a", "school", 1), spec("b", "school", 2),
+      { id: "c", kind: "calc", formula: "change", args: [{ name: "before", value: "$a.value" }, { name: "after", value: "$b.value" }] },
+    ] } as unknown as Plan;
+    expect(await planEntityLabels(query, plan)).toEqual({ school: { "1": "Springfield High", "2": "Shelbyville High" } });
+  });
+  it("lists of ids are named one by one; step references are skipped; out-of-scope ids stay unnamed", async () => {
+    const plan = { kind: "plan", answer_from: ["a"], expected_shape: "scalar", steps: [spec("a", "student", [1203, 1207]), spec("b", "student", "$a.rows[*].student")] } as unknown as Plan;
+    expect(await planEntityLabels(query, plan)).toEqual({ student: { "1203": "Bart Simpson" } });
   });
 });

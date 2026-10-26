@@ -11,8 +11,11 @@ export type VizOut = { type: "stat" | "line" | "bar" | "calendar" | "table"; tit
 export type ClarificationOption = { label: string; entity?: { type: string; id: number | string; label?: string; detail?: string } };
 /** What a clicked chip sends back: the chosen entity by id. */
 export type Pin = { type: string; id: number | string; label: string; detail?: string };
-/** The plan's steps as stored: enough to know a step's metric or formula. */
-export type PlanStep = { id: string; kind: "spec"; spec: { metric: string } } | { id: string; kind: "calc"; formula: string } | { id: string; kind: "sql" };
+/** The plan's steps as stored: a spec's metric and the entity it asks about, a calc's formula and the arguments it reads. */
+export type PlanStep =
+  | { id: string; kind: "spec"; spec: { metric: string; entity?: { type: string; id: unknown } } }
+  | { id: string; kind: "calc"; formula: string; args?: { name: string; value: unknown }[] }
+  | { id: string; kind: "sql" };
 export type PlanOut = { kind: "plan"; steps: PlanStep[]; answer_from: string[]; expected_shape: string } | { kind: "out_of_scope"; reason: string; message: string; suggestion?: string; options?: ClarificationOption[] } | null;
 export type Caveat = { kind: string; text: string };
 /** labels: names for id columns, resolved as the asking persona ({column: {id: label}}); absent on runs stored before it existed. */
