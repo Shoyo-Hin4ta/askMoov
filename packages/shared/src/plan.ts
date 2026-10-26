@@ -85,6 +85,8 @@ export const MAX_STEPS = 4;
 export const MAX_REPLANS = 2;
 export const MAX_SQL_REGENERATIONS = 2;
 export const MAX_CORRECTIVE_CALLS = 1;
+/** The writer gets two chances to quote only numbers it was shown before the run fails (Ritik, 2026-10-26); the chart check keeps one. */
+export const MAX_PROSE_CORRECTIONS = 2;
 /** 240s, not the doc's 60s: a planner call on Opus takes 10-20s and two replans plus tier-3 regenerations must fit. The worker function allows 300s. */
 export const RUN_TIME_BUDGET_MS = 240_000;
 /** Deadline for one model call. The SDK's timeout covers only the response headers; this covers the body, where generation time goes. 3-4x the slowest healthy call observed (25 s). */

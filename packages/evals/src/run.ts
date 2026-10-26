@@ -50,6 +50,8 @@ async function runCase(c: Case, episodesEnabled: boolean): Promise<Outcome> {
 async function check(c: Case, s: State, userId: number, role: string): Promise<string[]> {
   const e = c.expect, out: string[] = [];
   const plan = s.plan_output;
+  // a node that failed the run (a presenter gate, a budget) is a miss on its own; before this a case with no viz_type passed on a failed run
+  if (s.error) out.push(`run error: ${s.error}`);
   if (e.kind && plan?.kind !== e.kind) out.push(`kind: expected ${e.kind}, got ${plan?.kind ?? "none"}${s.error ? ` (error: ${s.error})` : ""}`);
   if (e.reason && plan?.kind === "out_of_scope" && plan.reason !== e.reason) out.push(`reason: expected ${e.reason}, got ${plan.reason}`);
   if (e.options_min && plan?.kind === "out_of_scope" && (plan.options?.length ?? 0) < e.options_min) out.push(`options: expected >= ${e.options_min}`);

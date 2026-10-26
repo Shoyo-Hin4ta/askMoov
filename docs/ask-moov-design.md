@@ -140,7 +140,7 @@ Six nodes. `intake` is folded into `plan` as pre-processing. `classify` is folde
 | `plan` | yes | Load the schema doc from the process cache, resolve entities and dates via tools, retrieve up to 3 episodes by sketch key (code, not a tool), emit `Plan` or `OutOfScope` as plain JSON. Then the post-planner code checks (4.5a), plan validation and a compile of every spec. On a schema miss or an invalid plan, one corrective call with the error attached. |
 | `execute` | tier 3 only | One plan step per visit, so every step gets its own checkpoint. Resolve `$refs`, compile (spec) or accept (sql), validate, EXPLAIN, run on the scoped connection, store rows. Collect caveats. |
 | `critique` | yes | Given the question, the resolved entities, each step's definition and SQL, up to 5 sample rows with ids written as names, a facts block code computed over the full result, and the caveats: `{pass, reason, fixes?}`. Sees no planner reasoning. |
-| `present` | yes | Given the same material plus the chart type code derived per candidate step: `{answer_md, viz}` where `viz.step` names the step the chart is drawn from. Code checks the chart can be drawn from that step; one corrective call; then a named error. |
+| `present` | yes | Given the same material plus the chart type code derived per candidate step: `{answer_md, viz}` where `viz.step` names the step the chart is drawn from. Code checks the chart can be drawn from that step (one corrective call, then `VizValidationError`) and that every number in the text is a rounding of a number the presenter was shown (two corrective calls, then `ProseValidationError`). |
 | `fail` | no | Terminal. Writes the reason to `runs.error`. |
 
 Edges:
@@ -151,7 +151,7 @@ Edges:
 - `execute` → `critique` on success. `execute` → `plan` with the rejection attached if a tier-3 step fails validation or SQL (`retries.sql < 2`). `execute` → `fail` on a fatal error.
 - `critique` → `present` on pass. `critique` → `plan` with the critique attached if `retries.plan < 2`. `critique` → `present` with `uncertain = true` otherwise.
 
-Hard limits: 4 steps per plan, 2 replans, 2 SQL regenerations per step, 1 corrective planner call per attempt, 1 corrective presenter call, 240 s run budget checked before every model round and between steps, 90 s deadline on every model call (body included), 5 s statement timeout per query, `RUN_TOKEN_CAP` tokens per run spanning attempts (4.13), 30 s heartbeat.
+Hard limits: 4 steps per plan, 2 replans, 2 SQL regenerations per step, 1 corrective planner call per attempt, 1 corrective presenter call for the chart and 2 for the numbers in the text, 240 s run budget checked before every model round and between steps, 90 s deadline on every model call (body included), 5 s statement timeout per query, `RUN_TOKEN_CAP` tokens per run spanning attempts (4.13), 30 s heartbeat.
 
 ### 4.2 State
 
@@ -350,6 +350,8 @@ const VizSpec = z.object({
 
 Prose rules: describe the shape of the result from the facts (the peak, the low, the trend, the total); every number comes from a step value, the facts or the sample rows; no arithmetic between numbers, with rounding to one decimal and a rate written as a percentage the only allowed rewriting; exactly one visual, named by its type; people and rooms by name; empty dimensions explained from the caveats; the date range stated. Rows are fetched by the frontend from `ops.run_results`, never embedded; `ops.run_output.labels` carries the names for id columns so the chart draws names and the rows keep ids.
 
+The number rule is enforced in code (`prose.ts`), not only in the prompt. Every number and clock time in `answer_md`, `viz.title`, the axis labels, the series and the presenter's caveats must be a rounding, at the written precision, of a number the presenter was shown: the question, the entities, each step's definition without its `limit`, and each step's body (value, row count, sample rows, facts, calc explanation). The SQL text and the critic's free text are not sources. A 0 to 1 rate may be written as a percentage; times compare as minutes of the day. A miss gets a corrective call naming the offending numbers, twice, then `ProseValidationError` fails the run. Accepted limits: numbers written as words are not checked, and small integers are often incidentally present (dates, ids), so a derived "2 of them" can pass while 2.3, 1,533 or 2,500 cannot.
+
 ### 4.10 Prompt layout and caching
 
 System prompt for `plan`, in this order so the static prefix caches:
@@ -409,7 +411,8 @@ Vitest, 211 tests, none needs a database or a key.
 | `lookup-entity.test` | Tie logic; honorifics stripped; first-name agreement; pins answer without a query; numeric ids. |
 | `facts.test`, `labels.test` | The facts block per shape; the series rule; id columns never taken as the value. Labels resolved per entity type and written as "Name (id)". |
 | `heartbeat.test` | Beats on the interval; stops at the budget; stops on a lost lease; a failed write is reported; no stacking. |
-| `graph.test` | Happy path visits sketch → plan → execute → critique → present. Sketch failure reaches plan with no episodes. Critic failure replans at most twice then presents uncertain. Ambiguous lookup becomes a clarification even if the planner emitted a plan. One corrective planner call. The presenter's chart step is recorded and checked. Chaos crash after execute resumes on attempt 2 without re-running earlier nodes. Pins persist, replace on a new name, and survive two names in one question. A 500-row result keeps state under 32 KB. |
+| `graph.test` | Happy path visits sketch → plan → execute → critique → present. Sketch failure reaches plan with no episodes. Critic failure replans at most twice then presents uncertain. Ambiguous lookup becomes a clarification even if the planner emitted a plan. One corrective planner call. The presenter's chart step is recorded and checked. An invented number in the text gets a correction that names it, twice, then `ProseValidationError`; a chart miss and a number miss share one correction. Chaos crash after execute resumes on attempt 2 without re-running earlier nodes. Pins persist, replace on a new name, and survive two names in one question. A 500-row result keeps state under 32 KB. |
+| `prose.test` | The tokenizer (thousands groups vs id lists, sentence-final points, en dashes, percent marks, ordinals, markdown, list markers, clock times, ISO datetimes, hour buckets). Rounding at the written precision, sign ignored, rates as percentages. Real answers from 2026-10-26 accepted against their real inputs; "2.3 percentage points", "1,533 hours", "about 2,500", a derived end hour and SQL constants rejected. |
 | `resolve-dates.test`, `viz.test`, `transcript.test` | Calendar math; chart step and type rules; prompt blocks split and expanded. |
 | `apps/web` pure modules | Grouped-bar pivot, rate formatting, label lookup, policy text rules, schema document parsing, trace grouping. |
 

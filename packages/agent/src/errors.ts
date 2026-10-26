@@ -79,6 +79,9 @@ export class RunBudgetError extends AgentError {
 /** The presenter's chart cannot be drawn from the step it chose (fields outside that step's columns), after its one corrective call. */
 export class VizValidationError extends AgentError {}
 
+/** The presenter's text carries a number that appears in none of its inputs (step values, facts, sample rows, entities, question), after its corrective calls. */
+export class ProseValidationError extends AgentError {}
+
 /** A 4xx from the API other than rate limiting: bad request, auth, not found. Not retryable; a code or config problem. */
 export class LlmRequestError extends AgentError {
   constructor(readonly status: number | undefined, message: string) {

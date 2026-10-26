@@ -1,15 +1,20 @@
-import { MAX_CORRECTIVE_CALLS, presentationFor, vizTypeForShape, type Presentation, type VizSpec } from "@ask-moov/shared";
+import { MAX_CORRECTIVE_CALLS, MAX_PROSE_CORRECTIONS, presentationFor, vizTypeForShape, type Presentation, type VizSpec } from "@ask-moov/shared";
 import type { AgentDeps } from "../deps";
-import { LlmParseError, VizValidationError } from "../errors";
+import { LlmParseError, ProseValidationError, VizValidationError } from "../errors";
 import { MODELS, type MessageParam } from "../llm";
 import { presenterSystem } from "../prompts";
+import { allowedFrom, proseMismatch } from "../prose";
 import type { State, StateUpdate, StepResult } from "../state";
-import { entitiesText, errorText, isFatal, runBudget, summarizeSteps } from "./shared";
+import { composeSummary, entitiesText, errorText, isFatal, numberSources, runBudget, stepSummaries } from "./shared";
 
 /**
  * The presenter names the step the chart is drawn from (viz.step) out of the plan's answer_from list; code derives the
  * chart type per candidate, checks the chosen step can supply the fields the chart names, allows one corrective call
  * (schema miss or field mismatch), then fails loudly. One decision, recorded in viz, read by the UI and the episode store.
+ *
+ * Code also checks every number the presenter wrote against the numbers it was shown (prose.ts): a miss gets a corrective
+ * call naming the numbers, twice, then ProseValidationError. Both checks run on the same output and share one correction
+ * round when both fail, so a chart fix never spends the only chance to fix a number.
  */
 export async function presentNode(state: State, deps: AgentDeps): Promise<StateUpdate> {
   const plan = state.plan_output;
@@ -21,16 +26,20 @@ export async function presentNode(state: State, deps: AgentDeps): Promise<StateU
   }
 
   try {
-    const summary = await summarizeSteps(state, deps);
+    const parts = await stepSummaries(state, deps);
+    const summary = composeSummary(parts);
     const caveats = state.caveats.map((c) => c.text);
     const candidates = plan.answer_from.map((id) => describeCandidate(id, state.steps[id])).join("\n");
     const base: MessageParam[] = [{
       role: "user",
       content: `<question>${state.question}</question>\n<entities>\n${entitiesText(state)}\n</entities>\n<steps>\n${summary}\n</steps>\n<caveats>\n${caveats.map((c) => `- ${c}`).join("\n") || "(none)"}\n</caveats>\n<answer_steps>\n${candidates}\n</answer_steps>\n<uncertain>${state.uncertain ? `yes: ${state.critic_verdict?.reason ?? ""}` : "no"}</uncertain>`,
     }];
+    // what the writer may quote: the data blocks it was shown, minus the SQL text and the critic's free text (prose.ts)
+    const allowed = allowedFrom([state.question, entitiesText(state), ...numberSources(parts), candidates]);
     const schema = presentationFor(plan.answer_from);
     let messages = base;
     let corrective = 0;
+    let proseFixes = 0;
     for (;;) {
       let output: Presentation;
       try {
@@ -43,23 +52,36 @@ export async function presentNode(state: State, deps: AgentDeps): Promise<StateU
         }
         throw e;
       }
-      const problem = vizMismatch(output.viz, state.steps[output.viz.step]);
-      if (!problem) {
+      const vizProblem = vizMismatch(output.viz, state.steps[output.viz.step]);
+      const proseProblem = proseMismatch(modelStrings(output), allowed);
+      if (!vizProblem && !proseProblem) {
         const viz: VizSpec = { ...output.viz, caveats: mergeCaveats(output.viz.caveats, caveats) };
         return { answer: output.answer_md, viz, messages: [{ role: "assistant", content: output.answer_md }], last_node: "present" };
       }
-      if (corrective >= MAX_CORRECTIVE_CALLS) throw new VizValidationError(problem);
-      corrective += 1;
+      if (vizProblem && corrective >= MAX_CORRECTIVE_CALLS) throw new VizValidationError(vizProblem);
+      if (proseProblem && proseFixes >= MAX_PROSE_CORRECTIONS) throw new ProseValidationError(proseProblem);
+      if (vizProblem) corrective += 1;
+      if (proseProblem) proseFixes += 1;
+      const fixes = [
+        vizProblem ? `${vizProblem}. Name x.field and y.field from the columns of viz.step, or set viz.step to the step whose columns you described.` : "",
+        proseProblem ? `${proseProblem}. Every number in answer_md, viz.title, the axis labels, series and caveats must appear in the steps, facts, sample rows or entities above, at most rounded for reading, or be a 0 to 1 rate written as a percentage. Do not compute new numbers: no differences, no sums, no unit conversions, no counting rows, no end times. If a comparison was not computed, put the computed numbers side by side.` : "",
+      ].filter(Boolean).join("\n");
       messages = [
         ...base,
         { role: "assistant", content: JSON.stringify(output) },
-        { role: "user", content: `That presentation failed validation: ${problem}\nReturn a corrected presentation: name x.field and y.field from the columns of viz.step, or set viz.step to the step whose columns you described.` },
+        { role: "user", content: `That presentation failed validation: ${fixes}\nReturn a corrected presentation.` },
       ];
     }
   } catch (e) {
     if (isFatal(e)) return { error: errorText(e), last_node: "present" };
     throw e;
   }
+}
+
+/** Every string the model wrote and the reader will see; code's own caveat sentences are merged in afterwards and carry no digits. */
+function modelStrings(output: Presentation): (string | undefined)[] {
+  const v = output.viz;
+  return [output.answer_md, v.title, v.x?.label, v.y?.label, ...(v.series ?? []), ...v.caveats];
 }
 
 /** One line per answer_from candidate: "b: table, 24 rows, columns wing, period, value". */

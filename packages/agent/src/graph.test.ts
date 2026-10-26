@@ -107,6 +107,71 @@ describe("graph topology", () => {
       expect(out.error).toContain("VizValidationError: wing is not a column of step a; its columns are value");
       expect(out.viz).toBeNull();
     });
+
+    it("a chart miss and an invented number on the same output share one corrective round that names both", async () => {
+      const both = { json: { ...bar("a").json, answer_md: "East leads with about 1,533 passes." } };
+      const { client, calls } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, twoSteps], critique: [pass], present: [both, bar("b")] });
+      const lastUser: string[] = [];
+      const create = client.messages.create.bind(client.messages);
+      client.messages.create = async (params, options) => {
+        const m = params.messages[params.messages.length - 1];
+        if (m && typeof m.content === "string") lastUser.push(m.content);
+        return create(params, options);
+      };
+      const out = (await buildGraph(depsWithColumns(client)).invoke(input("run-viz-4"))) as State;
+      expect(out.error).toBeNull();
+      expect(calls["present"]).toBe(2);
+      expect(out.viz?.step).toBe("b");
+      const correction = lastUser.find((t) => t.startsWith("That presentation failed validation"));
+      expect(correction).toContain("wing is not a column of step a");
+      expect(correction).toContain("not in the results: 1,533");
+    });
+  });
+
+  describe("the presenter's numbers come from the results", () => {
+    // the step value is 12 (fakeDeps); 1,533 appears in no input the writer saw
+    const invented = { json: { answer_md: "Bart took 12 passes, about 1,533 hours.", viz: { type: "stat", title: "Passes", caveats: [], step: "a" } } };
+
+    it("an invented number gets a corrective call that names it, then the corrected answer ships", async () => {
+      const { client, calls } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([specStep])], critique: [pass], present: [invented, presentation] });
+      const lastUser: string[] = [];
+      const create = client.messages.create.bind(client.messages);
+      client.messages.create = async (params, options) => {
+        const m = params.messages[params.messages.length - 1];
+        if (m && typeof m.content === "string") lastUser.push(m.content);
+        return create(params, options);
+      };
+      const out = (await buildGraph(fakeDeps(client)).invoke(input("run-prose-1"))) as State;
+      expect(out.error).toBeNull();
+      expect(calls["present"]).toBe(2);
+      expect(out.answer).toBe("Bart took 12 passes.");
+      expect(lastUser.some((t) => t.includes("not in the results: 1,533"))).toBe(true);
+    });
+
+    it("the writer gets two corrections", async () => {
+      const { client, calls } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([specStep])], critique: [pass], present: [invented, invented, presentation] });
+      const out = (await buildGraph(fakeDeps(client)).invoke(input("run-prose-2"))) as State;
+      expect(out.error).toBeNull();
+      expect(calls["present"]).toBe(3);
+      expect(out.answer).toBe("Bart took 12 passes.");
+    });
+
+    it("a third invented number fails the run with a named error instead of shipping it", async () => {
+      const { client, calls } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([specStep])], critique: [pass], present: [invented, invented, invented] });
+      const out = (await buildGraph(fakeDeps(client)).invoke(input("run-prose-3"))) as State;
+      expect(calls["present"]).toBe(3);
+      expect(out.error).toBe("ProseValidationError: not in the results: 1,533");
+      expect(out.answer).toBeNull();
+      expect(out.viz).toBeNull();
+    });
+
+    it("a number in the chart title is checked too", async () => {
+      const titled = { json: { answer_md: "Bart took 12 passes.", viz: { type: "stat", title: "Passes, about 60 a month", caveats: [], step: "a" } } };
+      const { client, calls } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([specStep])], critique: [pass], present: [titled, presentation] });
+      const out = (await buildGraph(fakeDeps(client)).invoke(input("run-prose-4"))) as State;
+      expect(out.error).toBeNull();
+      expect(calls["present"]).toBe(2);
+    });
   });
 
   it("out_of_scope skips execute and critique", async () => {
@@ -309,7 +374,9 @@ describe("graph topology", () => {
 
   it("state stays small: a 500-row result goes to the store, never into graph state (design 5, state.size)", async () => {
     const grouped = { ...specStep, spec: { ...specStep.spec, group_by: ["student"], limit: 500 } };
-    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([grouped])], critique: [pass], present: [presentation] });
+    // the writer sees five sample rows and the facts, never the 500 rows, so its text must not quote a row it was not shown
+    const ranked = { json: { answer_md: "The top classmate took 500 passes.", viz: { type: "bar", title: "Passes by classmate", caveats: [], step: "a" } } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBart] }, planWith([grouped])], critique: [pass], present: [ranked] });
     const rows: Row[] = Array.from({ length: 500 }, (_, i) => ({ student: 1000 + i, value: 500 - i }));
     const deps = fakeDeps(client);
     const base = deps.scopedQuery.bind(deps);
