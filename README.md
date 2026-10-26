@@ -10,7 +10,7 @@ The model fills in a typed plan. Code compiles it, validates it, runs it and pre
 cp .env.example .env            # fill DATABASE_URL_ADMIN, ANTHROPIC_API_KEY, WORKER_SECRET, APP_URL
 npm install
 npx supabase login && npx supabase link --project-ref <ref>
-npm run db:push                 # 25 migrations: domain, ops, memory, langgraph, views, roles + RLS, cron, run_output, derived tables, view fixes, drop raw event tables, redispatch cap, pins, retention, run_output labels, model-call transcripts, episode cleanup, ops list indexes
+npm run db:push                 # 26 migrations: domain, ops, memory, langgraph, views, roles + RLS, cron, run_output, derived tables, view fixes, drop raw event tables, redispatch cap, pins, retention, run_output labels, model-call transcripts, episode cleanup, ops list indexes, chats kept for good
 npm run db:roles                # role passwords -> .env, Vault secrets for the cron
 npm run db:vault -- <url>       # after deploying: point the cron re-dispatch at the public URL (writes Vault app_url + worker_secret, touches no password)
 npm run seed                    # two schools, 40 school days, 13 planted stories (~3 min)
