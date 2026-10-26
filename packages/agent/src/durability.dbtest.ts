@@ -125,27 +125,33 @@ describe("durability.idempotency", () => {
 });
 
 describe("memory.retention", () => {
-  it("ops.retention() drops the thread memory of a thread with no question in 30 days, and of a thread with no run at all", async () => {
+  it("ops.retention() keeps a chat's memory and rows however old; an eval thread loses its memory a day after its run, a thread with no run at all loses it too", async () => {
     const tag = randomUUID().slice(0, 8);
-    const threads = { old: `eval-retention-old-${tag}`, fresh: `eval-retention-fresh-${tag}`, orphan: `eval-retention-orphan-${tag}` };
-    const runs = { old: randomUUID(), fresh: randomUUID() };
+    const threads = { chat: `t-retention-chat-${tag}`, evalOld: `eval-retention-old-${tag}`, evalFresh: `eval-retention-fresh-${tag}`, orphan: `eval-retention-orphan-${tag}` };
+    const runs = { chat: randomUUID(), evalOld: randomUUID(), evalFresh: randomUUID() };
     const persona = JSON.stringify(personaFor("teacher"));
     const checkpoint = (thread: string) => admin.query("insert into langgraph.checkpoints (thread_id, checkpoint_ns, checkpoint_id, checkpoint) values ($1, '', 'cp-1', '{}'::jsonb)", [thread]);
     try {
-      await admin.query("insert into ops.runs (id, thread_id, persona, question, status, created_at) values ($1, $2, $3, 'retention test', 'succeeded', now() - interval '31 days')", [runs.old, threads.old, persona]);
-      await admin.query("insert into ops.runs (id, thread_id, persona, question, status) values ($1, $2, $3, 'retention test', 'succeeded')", [runs.fresh, threads.fresh, persona]);
+      await admin.query("insert into ops.runs (id, thread_id, persona, question, status, created_at) values ($1, $2, $3, 'retention test', 'succeeded', now() - interval '400 days')", [runs.chat, threads.chat, persona]);
+      await admin.query("insert into ops.runs (id, thread_id, persona, question, status, created_at) values ($1, $2, $3, 'retention test', 'succeeded', now() - interval '2 days')", [runs.evalOld, threads.evalOld, persona]);
+      await admin.query("insert into ops.runs (id, thread_id, persona, question, status) values ($1, $2, $3, 'retention test', 'succeeded')", [runs.evalFresh, threads.evalFresh, persona]);
+      await admin.query("insert into ops.run_results (run_id, step_id, columns, row_count, rows, created_at) values ($1, 'a', '[\"value\"]'::jsonb, 1, '[{\"value\": 1}]'::jsonb, now() - interval '400 days')", [runs.chat]);
       for (const t of Object.values(threads)) await checkpoint(t);
-      await admin.query("insert into langgraph.checkpoint_writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, blob) values ($1, '', 'cp-1', 't', 0, 'c', '\\x00'::bytea)", [threads.old]);
-      await admin.query("insert into langgraph.checkpoint_blobs (thread_id, checkpoint_ns, channel, version, type, blob) values ($1, '', 'c', '1', 'json', '\\x00'::bytea)", [threads.old]);
+      for (const t of [threads.chat, threads.evalOld]) {
+        await admin.query("insert into langgraph.checkpoint_writes (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, blob) values ($1, '', 'cp-1', 't', 0, 'c', '\\x00'::bytea)", [t]);
+        await admin.query("insert into langgraph.checkpoint_blobs (thread_id, checkpoint_ns, channel, version, type, blob) values ($1, '', 'c', '1', 'json', '\\x00'::bytea)", [t]);
+      }
 
       await admin.query("select ops.retention()");
 
       const left = async (table: string) => Object.fromEntries((await admin.query(`select thread_id, count(*)::int as n from langgraph.${table} where thread_id = any($1) group by thread_id`, [Object.values(threads)])).rows.map((r) => [r["thread_id"], r["n"]]));
-      expect(await left("checkpoints")).toEqual({ [threads.fresh]: 1 });
-      expect(await left("checkpoint_writes")).toEqual({});
-      expect(await left("checkpoint_blobs")).toEqual({});
-      // the run rows themselves are kept: runs and run_steps are the trace, only rows that can hold names or result rows expire
-      expect(Number((await admin.query("select count(*) as n from ops.runs where id = any($1)", [Object.values(runs)])).rows[0]!["n"])).toBe(2);
+      // the chat keeps its memory after more than a year; the day-old eval thread and the orphan lose theirs; the fresh eval thread keeps it until tomorrow
+      expect(await left("checkpoints")).toEqual({ [threads.chat]: 1, [threads.evalFresh]: 1 });
+      expect(await left("checkpoint_writes")).toEqual({ [threads.chat]: 1 });
+      expect(await left("checkpoint_blobs")).toEqual({ [threads.chat]: 1 });
+      // the chat's result rows and every run row stay
+      expect(Number((await admin.query("select count(*) as n from ops.run_results where run_id = $1", [runs.chat])).rows[0]!["n"])).toBe(1);
+      expect(Number((await admin.query("select count(*) as n from ops.runs where id = any($1)", [Object.values(runs)])).rows[0]!["n"])).toBe(3);
     } finally {
       await admin.query("delete from ops.runs where id = any($1)", [Object.values(runs)]);
       for (const t of ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]) await admin.query(`delete from langgraph.${t} where thread_id = any($1)`, [Object.values(threads)]);
