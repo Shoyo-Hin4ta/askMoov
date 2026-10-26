@@ -41,7 +41,7 @@ What it is not: a MOOV clone, a dashboard, a RAG system, a multi-agent system, a
 │ GET  /api/runs/[id]/trace   full trace of one run         │
 │ GET  /api/threads, /api/threads/[id]                      │
 └──────────┬───────────────────▲─────────────────────────────┘
-           │ pg (session pooler)│ HTTPS via pg_net
+           │ pg (pooler :6543)  │ HTTPS via pg_net
            ▼                   │
 ┌──────── Supabase Postgres 17 ──────────────────────────────┐
 │ public:    dimension tables, passes, attendance, cards,     │
@@ -674,7 +674,7 @@ Fourteen topics: `taps`, `exit_taps`, `kiosk_location`, `one_active_card`, `bath
 
 ```
 DATABASE_URL_ADMIN=            # postgres, migrations, seed, role setup; never on Vercel
-DATABASE_URL_APP=              # ask_moov_app; on Vercel the IPv4 session pooler host
+DATABASE_URL_APP=              # ask_moov_app; on Vercel the IPv4 pooler host in transaction mode (port 6543)
 DATABASE_URL_QUERY=            # ask_moov_query; same
 ANTHROPIC_API_KEY=
 APP_URL=                       # public base URL; /api/ask pings APP_URL/api/worker; Vault holds the deployment's copy for the cron
@@ -745,5 +745,5 @@ Everything below is built, tested and deployed; the session logs carry the evide
 12. **Prompt injection.** The renderer disallows images, links and raw HTML; episode text and tool results are delimited as data; three injection cases in the golden set; the `/ops` and trace pages are open by decision.
 13. **Evals.** 90 cases, 30 per persona, every number computed from the seed as the asking persona; `viz_metric` and `caveats_include` assertions; a `--only` run never overwrites `report.md`; a runtime error is one failed row. Latest: 89/90 off, 90/90 on.
 14. **Frontend.** Rebuilt as modular components, responsive, grouped bars, names on charts and in tables, rates as percentages, em dash for null, persistent votes, thread reopening with transcripts, Operations and Schema links, `/schema`, `/ops/runs/[id]`, Trace links.
-15. **Deployment.** GitHub `Shoyo-Hin4ta/askMoov`, Vercel project `ask-moov` (Hobby, Fluid compute, root `apps/web`), Supabase session pooler hosts (the direct host is IPv6-only), Vault `app_url` set by `npm run db:vault`. The cron re-dispatch was verified against the deployment.
+15. **Deployment.** GitHub `Shoyo-Hin4ta/askMoov`, Vercel project `ask-moov` (Hobby, Fluid compute, root `apps/web`), Supabase pooler hosts in transaction mode, port 6543 (the direct host is IPv6-only; the session pooler on 5432 gives each open socket one of a role's 15 slots, which four simultaneous questions exhausted on 2026-10-25), Vault `app_url` set by `npm run db:vault`. The cron re-dispatch was verified against the deployment.
 16. **Tests.** 211 unit, 24 database. Test files are excluded from the app's build-time type check and typed by `apps/web/tsconfig.test.json`.
