@@ -3,7 +3,7 @@ import { getAppPool, getQueryPool, withScope } from "@ask-moov/db";
 import { HEARTBEAT_INTERVAL_MS, RUN_TIME_BUDGET_MS } from "@ask-moov/shared";
 import { createCheckpointer } from "./checkpointer";
 import type { AgentDeps } from "./deps";
-import { retrieveEpisodes, templatize, writeEpisode } from "./episodes";
+import { entitiesOfRun, forMemory, retrieveEpisodes, templatize, writeEpisode } from "./episodes";
 import { RetryableError } from "./errors";
 import { buildGraph } from "./graph";
 import { startHeartbeat } from "./heartbeat";
@@ -190,10 +190,12 @@ async function complete(run: ops.RunRow, final: State, schemaVersion: string, o:
   if (episodes && plan?.kind === "plan") {
     const score = final.critic_verdict?.pass ? 1 : final.uncertain ? -1 : null;
     if (score !== null) {
+      const named = entitiesOfRun(final.resolved.entities, final.lookups);
+      const kept = forMemory(plan, final.critic_verdict, named);
       episodeId = await episodes.write({
         role: run.persona.role,
-        questionTemplated: templatize(run.question, final.resolved.entities, final.resolved.dates.map((d) => d.text)),
-        plan, shape: answerShape(plan, final.steps, final.viz), critique: final.critic_verdict, score, schemaVersion, gitSha: o.gitSha,
+        questionTemplated: templatize(run.question, named, final.resolved.dates.map((d) => d.text)),
+        plan: kept.plan, shape: answerShape(plan, final.steps, final.viz), critique: kept.critique, score, schemaVersion, gitSha: o.gitSha,
       });
     }
   }

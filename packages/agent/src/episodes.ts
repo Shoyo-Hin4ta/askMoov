@@ -1,4 +1,5 @@
 import type { Critique, Plan, Role, Shape, Sketch } from "@ask-moov/shared";
+import type { LookupRecord } from "./state";
 import type { ResolvedEntity } from "./tools/lookup-entity";
 
 /**
@@ -22,6 +23,11 @@ const NAMED_BY_FIRST_NAME = new Set<ResolvedEntity["type"]>(["student", "teacher
  * matched inside the token it had just written).
  */
 export function templatize(question: string, entities: ResolvedEntity[], datePhrases: string[]): string {
+  return replaceEntities(question, entities, datePhrases).replace(/\s+/g, " ").replace(/[\r\n]+/g, " ").trim().toLowerCase().slice(0, MAX_TEMPLATED_LENGTH);
+}
+
+/** The substitution behind templatize, leaving the text's case, spacing and length alone (plan text in an episode is SQL and prose). */
+export function replaceEntities(text: string, entities: ResolvedEntity[], datePhrases: string[]): string {
   const subs: { text: string; token: string }[] = [];
   for (const e of entities) {
     const forms = [e.label, e.text];
@@ -29,14 +35,31 @@ export function templatize(question: string, entities: ResolvedEntity[], datePhr
     for (const t of new Set(forms.map((f) => f.trim()))) if (t.length >= 2) subs.push({ text: t, token: `{${e.type}}` });
   }
   for (const d of datePhrases) if (d.trim()) subs.push({ text: d.trim(), token: "{date_range}" });
-  let out = question;
-  if (subs.length) {
-    subs.sort((a, b) => b.text.length - a.text.length);
-    const tokenFor = new Map(subs.map((s) => [s.text.toLowerCase(), s.token]));
-    const pattern = new RegExp(`\\b(?:${subs.map((s) => escape(s.text)).join("|")})\\b`, "gi");
-    out = out.replace(pattern, (m) => tokenFor.get(m.toLowerCase()) ?? m);
-  }
-  return out.replace(/\s+/g, " ").replace(/[\r\n]+/g, " ").trim().toLowerCase().slice(0, MAX_TEMPLATED_LENGTH);
+  if (subs.length === 0) return text;
+  subs.sort((a, b) => b.text.length - a.text.length);
+  const tokenFor = new Map(subs.map((s) => [s.text.toLowerCase(), s.token]));
+  const pattern = new RegExp(`\\b(?:${subs.map((s) => escape(s.text)).join("|")})\\b`, "gi");
+  return text.replace(pattern, (m) => tokenFor.get(m.toLowerCase()) ?? m);
+}
+
+/** Every entity a run named: its pins at the end and every lookup it resolved (a later lookup can evict an earlier pin). */
+export function entitiesOfRun(pins: ResolvedEntity[], lookups: LookupRecord[]): ResolvedEntity[] {
+  const resolved = lookups.flatMap((l) => (l.status === "resolved" && l.candidates[0] ? [{ ...l.candidates[0], text: l.text }] : []));
+  return [...pins, ...resolved];
+}
+
+export type Verdict = Pick<Critique, "pass">;
+
+/**
+ * What an episode keeps of a run (design 11.2: no names, no result rows). Free text the models wrote about the run's data
+ * does not survive as written: a tier-3 step's sql and reason lose the people the run named, and the critique keeps its
+ * verdict only, since its reason quotes names and results and nothing reads it back (2026-10-26: 63 stored episodes held
+ * student names this way). Rooms, wings and dates stay: they are not personal, and the SQL stays readable as an example.
+ */
+export function forMemory(plan: Plan, critique: Critique | null, entities: ResolvedEntity[]): { plan: Plan; critique: Verdict | null } {
+  const people = entities.filter((e) => NAMED_BY_FIRST_NAME.has(e.type));
+  const steps = plan.steps.map((s) => (s.kind === "sql" ? { ...s, sql: replaceEntities(s.sql, people, []), reason: replaceEntities(s.reason, people, []) } : s));
+  return { plan: { ...plan, steps }, critique: critique ? { pass: critique.pass } : null };
 }
 
 function escape(s: string): string {
@@ -71,7 +94,7 @@ export async function retrieveEpisodes(query: AppQuery, args: { sketch: Sketch; 
 }
 
 export async function writeEpisode(query: AppQuery, e: {
-  role: Role; questionTemplated: string; plan: Plan; shape: Shape; critique: Critique | null; score: number; schemaVersion: string; gitSha: string;
+  role: Role; questionTemplated: string; plan: Plan; shape: Shape; critique: Verdict | null; score: number; schemaVersion: string; gitSha: string;
 }): Promise<number> {
   const metrics = [...new Set(e.plan.steps.flatMap((s) => (s.kind === "spec" ? [s.spec.metric] : [])))];
   const rows = await query(

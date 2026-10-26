@@ -1,7 +1,7 @@
-import type { Persona, Plan, Critique, Role, Shape, Sketch } from "@ask-moov/shared";
+import type { Persona, Plan, Role, Shape, Sketch } from "@ask-moov/shared";
 import type { Llm } from "./llm";
 import type { SchemaDoc } from "./schema-doc";
-import type { EpisodeRef } from "./episodes";
+import type { EpisodeRef, Verdict } from "./episodes";
 import type { ResolvedEntity } from "./tools/lookup-entity";
 
 /** Everything the graph needs from the outside world. The worker builds the real one; tests build fakes. */
@@ -22,7 +22,7 @@ export type AgentDeps = {
   /** null when EPISODES_ENABLED=false. Writing happens in the worker after present. */
   episodes: {
     retrieve(args: { sketch: Sketch; role: Role; questionTemplated: string; schemaVersion: string }): Promise<EpisodeRef[]>;
-    write(e: { role: Role; questionTemplated: string; plan: Plan; shape: Shape; critique: Critique | null; score: number; schemaVersion: string; gitSha: string }): Promise<number>;
+    write(e: { role: Role; questionTemplated: string; plan: Plan; shape: Shape; critique: Verdict | null; score: number; schemaVersion: string; gitSha: string }): Promise<number>;
   } | null;
   trace: {
     toolCall(r: { run_id: string; node: string; tool: string; args: unknown; result: unknown; duration_ms: number }): Promise<void>;

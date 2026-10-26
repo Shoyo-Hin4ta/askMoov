@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { templatize } from "./episodes";
+import { entitiesOfRun, forMemory, replaceEntities, templatize } from "./episodes";
+import type { Plan } from "@ask-moov/shared";
 import type { ResolvedEntity } from "./tools/lookup-entity";
 
 /** Design 5: episodes.templatize. No name from `resolved` may survive into memory. */
@@ -38,5 +39,45 @@ describe("templatize", () => {
 
   it("leaves a question with no entities and no dates untouched apart from normalization", () => {
     expect(templatize("Who is out of class right now?", [], [])).toBe("who is out of class right now?");
+  });
+});
+
+/** Design 11.2: an episode keeps no names and no results, including free text the models wrote (2026-10-26). */
+describe("forMemory", () => {
+  const nelson: ResolvedEntity = { type: "student", id: 1207, label: "Nelson Muntz", detail: "grade 10", text: "Nelson" };
+  const sqlPlan: Plan = {
+    kind: "plan", answer_from: ["a"], expected_shape: "rows",
+    steps: [{ id: "a", kind: "sql", sql: "SELECT * FROM analytics.v_passes WHERE student_id = 1207 -- Nelson Muntz", reason: "pass_count gives totals, it cannot show whether Nelson Muntz (1207) and Bart were out together" }],
+  };
+
+  it("the critique keeps its verdict only: its reason quotes names and results", () => {
+    expect(forMemory(sqlPlan, { pass: true, reason: "Bart Simpson's (1203) passes, returns 8", fixes: "" }, [bart]).critique).toEqual({ pass: true });
+    expect(forMemory(sqlPlan, null, []).critique).toBeNull();
+  });
+
+  it("a tier-3 step's sql and reason lose every person the run named, by full name and by first name", () => {
+    const kept = forMemory(sqlPlan, null, [nelson, bart]).plan.steps[0]!;
+    expect(kept).toMatchObject({ kind: "sql" });
+    const text = JSON.stringify(kept);
+    expect(text).not.toMatch(/Nelson|Muntz|Bart/);
+    expect(text).toContain("{student} (1207) and {student} were out");
+  });
+
+  it("rooms and dates stay, and spec steps are untouched", () => {
+    const spec: Plan = { kind: "plan", answer_from: ["a"], expected_shape: "scalar", steps: [{ id: "a", kind: "spec", spec: { metric: "pass_count", entity: { type: "student", id: 1203 }, time_range: { start: "2026-10-01", end: "2026-10-13" } } }] };
+    expect(forMemory(spec, null, [bart]).plan).toEqual(spec);
+    const roomSql: Plan = { ...sqlPlan, steps: [{ id: "a", kind: "sql", sql: "SELECT 1", reason: "Room 214 this month" }] };
+    expect(forMemory(roomSql, null, [room]).plan.steps[0]).toMatchObject({ reason: "Room 214 this month" });
+  });
+});
+
+describe("replaceEntities and entitiesOfRun", () => {
+  it("replaceEntities keeps case, spacing and length; templatize is it plus normalization", () => {
+    expect(replaceEntities("Did  Bart Simpson go? SELECT x", [bart], [])).toBe("Did  {student} go? SELECT x");
+  });
+  it("a run's entities include what a later lookup evicted from the pins", () => {
+    const lookups = [{ type: "student" as const, text: "Bart Simpson", status: "resolved" as const, candidates: [{ type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", confidence: 1 }] }];
+    const reyes: ResolvedEntity = { type: "student", id: 1204, label: "Bart Reyes", detail: "grade 11", text: "Bart Reyes" };
+    expect(templatize("Compare Bart Simpson and Bart Reyes", entitiesOfRun([reyes], lookups), [])).toBe("compare {student} and {student}");
   });
 });

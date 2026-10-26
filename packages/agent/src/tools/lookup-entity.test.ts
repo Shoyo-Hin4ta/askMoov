@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chosenFor, decide, lookupEntity, lookupKey, nameAgreement, type EntityMatch, type ResolvedEntity } from "./lookup-entity";
+import { chosenFor, decide, lookupEntity, lookupKey, nameAgreement, pinEntity, settledByChoice, type EntityMatch, type LookupResult, type ResolvedEntity } from "./lookup-entity";
 
 /** Design 4.5a: code decides ties; the thresholds are numbers. Similarities below are the ones measured on the seed (2026-10-24). */
 const student = (label: string, confidence: number, id = 1): EntityMatch => ({ type: "student", id, label, detail: "", confidence });
@@ -66,6 +66,18 @@ describe("lookupEntity", () => {
     expect(r).toMatchObject({ status: "resolved", match: { id: 1203, confidence: 1 } });
   });
 
+  it("two pins that both answer a bare name do not pick one: the search runs and ties", async () => {
+    const pins: ResolvedEntity[] = [
+      { type: "student", id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" },
+      { type: "student", id: 1204, label: "Bart Reyes", detail: "grade 11", text: "Bart Reyes" },
+    ];
+    let queried = false;
+    const r = await lookupEntity(async () => { queried = true; return rows([student("Bart Reyes", 0.97, 1204), student("Bart Simpson", 0.97, 1203)]); }, pins, "student", "Bart");
+    expect(queried).toBe(true);
+    expect(r.status).toBe("ambiguous");
+    expect(await lookupEntity(async () => [], pins, "student", "Bart Reyes")).toMatchObject({ status: "resolved", match: { id: 1204 } });
+  });
+
   it("numeric ids come back as numbers so compiled predicates bind cleanly", async () => {
     const r = await lookupEntity(async () => rows([student("Ralph Wiggum", 0.97, 1209)]), [], "student", "Ralph");
     expect(r).toMatchObject({ status: "resolved", match: { id: 1209 } });
@@ -116,5 +128,46 @@ describe("lookupKey", () => {
     expect(lookupKey("section", "my 4th period", {})).not.toBe(lookupKey("section", "my 6th period", {}));
     expect(lookupKey("student", "Bart", { grade: 9 })).not.toBe(lookupKey("student", "Bart", { grade: 11 }));
     expect(lookupKey("student", "Bart", { grade: 9 })).not.toBe(lookupKey("student", "Bart", {}));
+  });
+});
+
+describe("settledByChoice", () => {
+  const simpsons: LookupResult = { status: "ambiguous", candidates: [
+    { type: "student", id: 1203, label: "Bart Simpson", detail: "grade 9", confidence: 0.9 },
+    { type: "student", id: 1205, label: "Lisa Simpson", detail: "grade 7", confidence: 0.9 },
+  ] };
+  const bart: ResolvedEntity = { type: "student", id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+  const lisa: ResolvedEntity = { type: "student", id: 1205, label: "Lisa Simpson", detail: "grade 7", text: "Lisa Simpson" };
+
+  it("a tie that contains the entity the user clicked resolves to it, whatever words the lookup used", () => {
+    expect(settledByChoice([bart], simpsons)).toMatchObject({ status: "resolved", match: { id: 1203, confidence: 1 } });
+  });
+  it("no chosen entity in the tie, two in it, or no tie at all: nothing to settle", () => {
+    const reyes: ResolvedEntity = { type: "student", id: 1204, label: "Bart Reyes", detail: "grade 11", text: "Bart Reyes" };
+    expect(settledByChoice([reyes], simpsons)).toBeNull();
+    expect(settledByChoice([bart, lisa], simpsons)).toBeNull();
+    expect(settledByChoice([bart], { status: "none", candidates: [] })).toBeNull();
+    expect(settledByChoice([], simpsons)).toBeNull();
+  });
+});
+
+describe("pinEntity", () => {
+  const simpson: ResolvedEntity = { type: "student", id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+  const reyes: ResolvedEntity = { type: "student", id: 1204, label: "Bart Reyes", detail: "grade 11", text: "Bart Reyes" };
+
+  it("naming someone else with the same first name replaces an inherited pin, so a bare name means the one named last", () => {
+    const set = pinEntity({ inherited: [simpson], added: [] }, reyes);
+    expect(set.inherited).toEqual([]);
+    expect(set.added.map((p) => p.id)).toEqual([1204]);
+  });
+  it("an inherited pin named again in this run is kept when a later lookup names a same-first-name person", () => {
+    let set = pinEntity({ inherited: [simpson], added: [] }, { ...simpson, text: "Bart Simpson" });
+    set = pinEntity(set, reyes);
+    expect(set.added.map((p) => p.id)).toEqual([1203, 1204]);
+    expect(set.inherited).toEqual([]);
+  });
+  it("the same entity pinned twice in one run is one pin", () => {
+    const set = pinEntity(pinEntity({ inherited: [], added: [] }, reyes), reyes);
+    expect(set.added).toHaveLength(1);
   });
 });

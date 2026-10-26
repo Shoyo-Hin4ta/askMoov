@@ -1,11 +1,11 @@
 # Ask MOOV evals (seeded)
 
-2026-10-26T05:25:51.113Z · git 2f078b1b · 1 cases
+2026-10-26T06:12:23.238Z · git 771dadbb · 1 cases
 
 ### Episodes off
 
-pass 1/1 · replan rate 0% · tier 3 rate 0% · uncertain 0 · tokens/question 27667 · p50 latency 19961 ms
+pass 1/1 · replan rate 100% · tier 3 rate 0% · uncertain 1 · tokens/question 55388 · p50 latency 57106 ms
 
 | case | run | pass | path | replans | tokens | ms | notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| teacher-bart-p4-classes-to-90 | ffe1a713-8bb7-4919-843e-3767aa425117 | ✓ | composed | 0 | 27667 | 19961 |  |
+| admin-room-214-reader | 9a83183d-3802-49cd-8cb1-733b1b26e680 | ✓ | composed | 2 | 55388 | 57106 |  |

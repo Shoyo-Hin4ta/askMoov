@@ -159,7 +159,7 @@ describe("memory.feedback", () => {
     const sketch = { metrics: ["temp_id_count" as const], entity_types: [], shape: "entity_by_day" as const };
     const schemaVersion = `dbtest-${randomUUID().slice(0, 8)}`;
     const episodeId = await writeEpisode(appQuery, {
-      role: "super_admin", questionTemplated: "durability vote test {student} {date_range}", shape: "entity_by_day", critique: { pass: true, reason: "ok" }, score: 1, schemaVersion, gitSha: "dbtest",
+      role: "super_admin", questionTemplated: "durability vote test {student} {date_range}", shape: "entity_by_day", critique: { pass: true }, score: 1, schemaVersion, gitSha: "dbtest",
       plan: { kind: "plan", steps: [{ id: "a", kind: "spec", spec: { metric: "temp_id_count", entity: { type: "student", id: 1 }, time_range: { start: "2026-10-01", end: "2026-10-13" }, group_by: ["day"] } }], answer_from: ["a"], expected_shape: "entity_by_day" },
     });
     const retrieve = async () => (await retrieveEpisodes(appQuery, { sketch, role: "super_admin", questionTemplated: "durability vote test {student} {date_range}", schemaVersion })).map((e) => e.id);

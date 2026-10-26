@@ -3,10 +3,10 @@ import type { AgentDeps } from "../deps";
 import { LlmParseError, PlanValidationError } from "../errors";
 import { renderEpisodes, templatize } from "../episodes";
 import { MODELS, type MessageParam } from "../llm";
-import { validatePlan } from "../plan-check";
+import { validatePlan, type KnownEntity } from "../plan-check";
 import { plannerSystem, plannerTools } from "../prompts";
 import type { State, StateUpdate, LookupRecord } from "../state";
-import { allPins, chosenFor, lookupEntity, lookupKey, pinEntity, type LookupFilters, type LookupResult, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
+import { allPins, chosenFor, lookupEntity, lookupKey, pinEntity, settledByChoice, type LookupFilters, type LookupResult, type PinSet, type ResolvedEntity } from "../tools/lookup-entity";
 import { everyDay, resolveDates, type ResolvedDates } from "../tools/resolve-dates";
 import { errorText, isFatal, pathOf, runBudget, threadMessages } from "./shared";
 
@@ -54,6 +54,7 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
             r = { status: "resolved", match, candidates: [match] };
           } else {
             r = await lookupEntity(scoped, entities(), i.type, i.text, filters);
+            r = settledByChoice(deps.pins, r) ?? r;
           }
           if (r.status === "resolved") answered.set(key, r);
         }
@@ -78,9 +79,13 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
   };
 
   const recentHistory = await recentHistoryText(deps, persona);
+  // The pins the planner is shown. With every entity a lookup resolves during the run, they are the ids code produced, so
+  // they stay valid even when a later lookup evicts the pin ("Bart Reyes" replacing an inherited "Bart Simpson").
+  const shown = entities();
+  const known = (): KnownEntity[] => [...shown, ...entities(), ...lookups.flatMap((l) => (l.status === "resolved" && l.candidates[0] ? [l.candidates[0]] : []))];
   const system = plannerSystem({
     schemaDoc: deps.schemaDoc, frozenNow: deps.frozenNow, episodesText: renderEpisodes(episodes),
-    entities: entities(), dates, recentHistory, replanContext: state.replan_context,
+    entities: shown, dates, recentHistory, replanContext: state.replan_context,
   });
 
   let corrective = state.retries.corrective;
@@ -105,21 +110,24 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
         }
         throw e;
       }
-      const checked = postCheck(output, persona, entities(), lookups);
-      if (checked.ok) {
-        return {
-          plan_output: checked.plan, episodes, lookups, resolved: { entities: entities(), dates }, retries: { ...state.retries, corrective },
-          replan_context: null, error: null, last_node: "plan",
-          path: checked.plan.kind === "plan" ? pathOf(checked.plan) : state.path,
-        };
+      const checked = postCheck(output, persona, known(), lookups, deps.pins);
+      // a check that only steers (asking again for what the user chose) keeps the planner's answer once no correction is left
+      if (!checked.ok && !(checked.fallback && corrective >= MAX_CORRECTIVE_CALLS)) {
+        if (corrective >= MAX_CORRECTIVE_CALLS) throw new PlanValidationError(checked.reason);
+        corrective += 1;
+        messages = [
+          ...transcript,
+          { role: "assistant", content: JSON.stringify(output) },
+          { role: "user", content: `That reply failed validation: ${checked.reason}\nReturn a corrected reply. Keep every entity id from the lookups above.` },
+        ];
+        continue;
       }
-      if (corrective >= MAX_CORRECTIVE_CALLS) throw new PlanValidationError(checked.reason);
-      corrective += 1;
-      messages = [
-        ...transcript,
-        { role: "assistant", content: JSON.stringify(output) },
-        { role: "user", content: `That plan failed validation: ${checked.reason}\nReturn a corrected plan. Keep every entity id from the lookups above.` },
-      ];
+      const plan = checked.ok ? checked.plan : checked.fallback!;
+      return {
+        plan_output: plan, episodes, lookups, resolved: { entities: entities(), dates }, retries: { ...state.retries, corrective },
+        replan_context: null, error: null, last_node: "plan",
+        path: plan.kind === "plan" ? pathOf(plan) : state.path,
+      };
     }
   } catch (e) {
     if (isFatal(e)) return { error: errorText(e), lookups, resolved: { entities: entities(), dates }, retries: { ...state.retries, corrective }, last_node: "plan" };
@@ -127,9 +135,22 @@ export async function planNode(state: State, deps: AgentDeps): Promise<StateUpda
   }
 }
 
-/** The two post-planner checks from design doc 4.5a plus validatePlan. */
-function postCheck(output: PlannerOutput, persona: Persona, entities: ResolvedEntity[], lookups: LookupRecord[]): { ok: true; plan: PlannerOutput } | { ok: false; reason: string } {
-  if (output.kind === "out_of_scope") return { ok: true, plan: output.reason === "needs_clarification" ? withCandidateEntities(output, lookups) : output };
+type Checked = { ok: true; plan: PlannerOutput } | { ok: false; reason: string; fallback?: PlannerOutput };
+
+/**
+ * The two post-planner checks from design doc 4.5a plus validatePlan. A clarification that offers an entity the user chose
+ * by chip in this run asks them to choose it again: the planner gets one correction, and keeps its clarification if none is
+ * left (it may be asking about something else the chip did not settle).
+ */
+function postCheck(output: PlannerOutput, persona: Persona, known: KnownEntity[], lookups: LookupRecord[], choices: ResolvedEntity[]): Checked {
+  if (output.kind === "out_of_scope") {
+    const plan = output.reason === "needs_clarification" ? withCandidateEntities(output, lookups) : output;
+    const again = output.reason === "needs_clarification"
+      ? choices.find((c) => output.options?.some((o) => o.entity && o.entity.type === c.type && String(o.entity.id) === String(c.id)))
+      : undefined;
+    if (again) return { ok: false, reason: `the user already chose ${again.label} (${again.type} ${again.id}) for this question by clicking it; answer with that ${again.type} instead of asking again`, fallback: plan };
+    return { ok: true, plan };
+  }
   const ambiguous = lookups.find((l) => l.status === "ambiguous");
   if (ambiguous) {
     const clarification: OutOfScope = {
@@ -141,7 +162,7 @@ function postCheck(output: PlannerOutput, persona: Persona, entities: ResolvedEn
     return { ok: true, plan: clarification };
   }
   try {
-    validatePlan(output, persona, entities.map((e) => ({ type: e.type, id: e.id })));
+    validatePlan(output, persona, known);
     return { ok: true, plan: output };
   } catch (e) {
     if (e instanceof PlanValidationError) return { ok: false, reason: e.message };

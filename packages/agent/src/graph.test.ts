@@ -390,4 +390,66 @@ describe("graph topology", () => {
     expect(entityQueries).toBe(0);
     expect(out.lookups).toEqual([expect.objectContaining({ text: "Simpson", status: "resolved", candidates: [expect.objectContaining({ id: 1203 })] })]);
   });
+
+  it("an inherited pin evicted by a same-first-name lookup in the same run stays a valid id for that run's plan", async () => {
+    const simpson = { type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+    const lookup = (text: string) => ({ name: "lookup_entity", input: { type: "student", text, filters: { grade: null, period: null, section_id: null, teacher_id: null } } });
+    const both = [
+      { id: "a", kind: "spec", spec: { metric: "pass_count", entity: { type: "student", id: 1203 }, time_range: { start: "2026-10-01", end: "2026-10-13" } } },
+      { id: "b", kind: "spec", spec: { metric: "pass_count", entity: { type: "student", id: 1204 }, time_range: { start: "2026-10-01", end: "2026-10-13" } } },
+    ];
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookup("Bart Simpson"), lookup("Bart Reyes")] }, planWith(both, ["a", "b"])], critique: [pass], present: [presentation] });
+    const deps = fakeDeps(client);
+    const base = deps.scopedQuery.bind(deps);
+    deps.scopedQuery = async (p, sql, params) => (sql.includes("v_entities") && String(params?.[0]).includes("Reyes")
+      ? { rows: [{ id: 1204, label: "Bart Reyes", detail: "grade 11", confidence: 1 }], columns: [] }
+      : base(p, sql, params));
+    const out = (await buildGraph(deps).invoke({ ...input("run-19", "Compare Bart Simpson and Bart Reyes this month"), resolved: { entities: [simpson], dates: [] } })) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    // both stay pinned for this run, so the critic and the writer can name both ids
+    expect(out.resolved.entities.map((e) => e.id).sort()).toEqual([1203, 1204]);
+  });
+
+  it("a planner that asks the user to choose again what they chose by chip gets one correction, then answers", async () => {
+    const bart = { type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+    const askAgain = { json: { kind: "out_of_scope", reason: "needs_clarification", message: "Which Bart?", options: [{ label: "Bart Simpson", entity: { type: "student", id: 1203 } }, { label: "Bart Reyes", entity: { type: "student", id: 1204 } }] } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [askAgain, planWith([specStep])], critique: [pass], present: [presentation] });
+    const lastUser: string[] = [];
+    const create = client.messages.create.bind(client.messages);
+    client.messages.create = async (params, options) => {
+      const m = params.messages[params.messages.length - 1];
+      if (m && typeof m.content === "string") lastUser.push(m.content);
+      return create(params, options);
+    };
+    const out = (await buildGraph(fakeDeps(client, { pins: [bart] })).invoke(input("run-20", "How many passes did Bart take this month?"))) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    expect(out.retries.corrective).toBe(1);
+    expect(lastUser.some((t) => t.includes("already chose Bart Simpson"))).toBe(true);
+  });
+
+  it("with no correction left, a clarification that repeats the chosen entity stands instead of failing the run", async () => {
+    const bart = { type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+    const askAgain = { json: { kind: "out_of_scope", reason: "needs_clarification", message: "Which Bart?", options: [{ label: "Bart Simpson", entity: { type: "student", id: 1203 } }] } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [askAgain, askAgain], present: [presentation] });
+    const out = (await buildGraph(fakeDeps(client, { pins: [bart] })).invoke(input("run-21", "How many passes did Bart take this month?"))) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "out_of_scope", reason: "needs_clarification" });
+  });
+
+  it("a tie that contains the clicked entity resolves to it whatever the lookup's words (no word rule needed)", async () => {
+    const bart = { type: "student" as const, id: 1203, label: "Bart Simpson", detail: "grade 9", text: "Bart Simpson" };
+    const lookupBoy = { name: "lookup_entity", input: { type: "student", text: "the Simpson boy", filters: { grade: null, period: null, section_id: null, teacher_id: null } } };
+    const { client } = fakeClient({ sketch: [sketch], plan: [{ toolUse: [lookupBoy] }, planWith([specStep])], critique: [pass], present: [presentation] });
+    const deps = fakeDeps(client, { pins: [bart] });
+    const base = deps.scopedQuery.bind(deps);
+    deps.scopedQuery = async (p, sql, params) => (sql.includes("v_entities")
+      ? { rows: [{ id: 1203, label: "Bart Simpson", detail: "grade 9", confidence: 0.9 }, { id: 1205, label: "Lisa Simpson", detail: "grade 7", confidence: 0.9 }], columns: [] }
+      : base(p, sql, params));
+    const out = (await buildGraph(deps).invoke(input("run-22", "How many passes did the Simpson boy take this month?"))) as State;
+    expect(out.error).toBeNull();
+    expect(out.plan_output).toMatchObject({ kind: "plan" });
+    expect(out.lookups).toEqual([expect.objectContaining({ text: "the Simpson boy", status: "resolved", candidates: [expect.objectContaining({ id: 1203 })] })]);
+  });
 });

@@ -37,9 +37,11 @@ export async function lookupEntity(
   const needle = text.trim().replace(/\s+/g, " ").replace(PEOPLE.has(type) ? HONORIFIC : /$^/, "");
   if (!needle) return { status: "none", candidates: [] };
 
-  const pinned = pins.find((p) => p.type === type && sameName(p.label, needle));
-  if (pinned) {
-    const match: EntityMatch = { type, id: pinned.id, label: pinned.label, detail: pinned.detail, confidence: 1 };
+  // A pin answers for its name. Two pins that both answer (the user named Bart Simpson and Bart Reyes in one question) do
+  // not pick one by list order: the search runs, ties, and the user is asked.
+  const pinned = pins.filter((p) => p.type === type && sameName(p.label, needle));
+  if (pinned.length === 1) {
+    const match: EntityMatch = { type, id: pinned[0]!.id, label: pinned[0]!.label, detail: pinned[0]!.detail, confidence: 1 };
     return { status: "resolved", match, candidates: [match] };
   }
 
@@ -136,9 +138,12 @@ export const allPins = (set: PinSet): ResolvedEntity[] => [...set.inherited, ...
  * is replaced, so "Bart" means the one the user named last (design 11.1).
  */
 export function pinEntity(set: PinSet, next: ResolvedEntity): PinSet {
-  if (allPins(set).some((p) => p.type === next.type && String(p.id) === String(next.id))) return set;
+  const same = (p: ResolvedEntity) => p.type === next.type && String(p.id) === String(next.id);
+  if (set.added.some(same)) return set;
+  // An inherited pin named again in this run moves to `added`, so a later lookup in the same run cannot evict it:
+  // "Compare Bart Simpson and Bart Reyes" on a thread that pinned Simpson keeps both, and the critic can name both ids.
   const collides = (p: ResolvedEntity) => p.type === next.type && (firstWord(p.label) === firstWord(next.label) || sameName(p.label, next.text));
-  return { inherited: set.inherited.filter((p) => !collides(p)), added: [...set.added, next] };
+  return { inherited: set.inherited.filter((p) => !same(p) && !collides(p)), added: [...set.added, next] };
 }
 
 /**
@@ -158,6 +163,19 @@ export function chosenFor(chosen: ResolvedEntity[], type: EntityType, text: stri
   }
   const numbers = text.match(/\d+/g) ?? [];
   return chosen.find((p) => p.type === type && numbers.every((n) => `${p.label} ${p.detail}`.includes(n)));
+}
+
+/**
+ * A tie the user already settled. When exactly one entity chosen by a clarification chip in this run is among the tied
+ * candidates, the click decides, whatever words the planner used for the lookup ("my class", a surname, a nickname): the
+ * user was shown these candidates and picked one. Two chosen entities in one tie stay a tie.
+ */
+export function settledByChoice(choices: ResolvedEntity[], r: LookupResult): LookupResult | null {
+  if (r.status !== "ambiguous") return null;
+  const hits = r.candidates.filter((c) => choices.some((p) => p.type === c.type && String(p.id) === String(c.id)));
+  if (hits.length !== 1) return null;
+  const match = { ...hits[0]!, confidence: 1 };
+  return { status: "resolved", match, candidates: [match] };
 }
 
 /**
