@@ -2,7 +2,7 @@
 
 An analytics agent over school ID-card tap data. A teacher, building admin or district admin asks a question in plain English and gets an answer, a chart, the caveats, and the SQL that produced it, scoped to exactly the data their role may see.
 
-The model fills in a typed plan. Code compiles it, validates it, runs it and presents it. Postgres row-level security is the only authorization. Design: `docs/ask-moov-design.md`. Status and checklist: `docs/PLAN.md`.
+The model fills in a typed plan. Code compiles it, validates it, runs it and presents it. A second model pass checks the results against the question, and code checks that every number in the written answer is one the results produced before anyone sees it. Postgres row-level security is the only authorization. Design: `docs/ask-moov-design.md`. Status and checklist: `docs/PLAN.md`.
 
 ## Run it
 
@@ -10,7 +10,7 @@ The model fills in a typed plan. Code compiles it, validates it, runs it and pre
 cp .env.example .env            # fill DATABASE_URL_ADMIN, ANTHROPIC_API_KEY, WORKER_SECRET, APP_URL
 npm install
 npx supabase login && npx supabase link --project-ref <ref>
-npm run db:push                 # 20 migrations: domain, ops, memory, langgraph, views, roles + RLS, cron, run_output, derived tables, view fixes, drop raw event tables, redispatch cap, pins, retention
+npm run db:push                 # 25 migrations: domain, ops, memory, langgraph, views, roles + RLS, cron, run_output, derived tables, view fixes, drop raw event tables, redispatch cap, pins, retention, run_output labels, model-call transcripts, episode cleanup, ops list indexes
 npm run db:roles                # role passwords -> .env, Vault secrets for the cron
 npm run db:vault -- <url>       # after deploying: point the cron re-dispatch at the public URL (writes Vault app_url + worker_secret, touches no password)
 npm run seed                    # two schools, 40 school days, 13 planted stories (~3 min)
